@@ -79,3 +79,47 @@ func TestSQLUserManager(t *testing.T) {
 		assert.NotNil(err)
 	}
 }
+
+func TestSQLUserEntryCRUD(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
+	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
+
+	uut, err := GetSQLUserManager(GetSqliteDialector(testDB))
+	assert.Nil(err)
+
+	utContext := context.Background()
+
+	// Case 0: create new user
+	userName0 := uuid.NewString()
+	userEntry, err := uut.RecordNewUser(utContext, userName0)
+	assert.Nil(err)
+	{
+		name, err := userEntry.GetName(utContext)
+		assert.Nil(err)
+		assert.Equal(userName0, name)
+		api, err := userEntry.GetAPIToken(utContext)
+		assert.Nil(err)
+		assert.Empty(api)
+	}
+
+	// Case 1: change username
+	userName1 := uuid.NewString()
+	assert.Nil(userEntry.SetName(utContext, userName1))
+	{
+		name, err := userEntry.GetName(utContext)
+		assert.Nil(err)
+		assert.Equal(userName1, name)
+	}
+
+	// Case 2: change API token
+	newAPI := uuid.NewString()
+	assert.Nil(userEntry.SetAPIToken(utContext, newAPI))
+	{
+		api, err := userEntry.GetAPIToken(utContext)
+		assert.Nil(err)
+		assert.Equal(newAPI, api)
+	}
+}
