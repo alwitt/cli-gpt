@@ -1,0 +1,285 @@
+package persistence
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/alwitt/goutils"
+	"github.com/apex/log"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+// sqlUserEntry SQL table representing a user
+type sqlUserEntry struct {
+	ID        string `gorm:"primaryKey"`
+	Name      string `gorm:"not null;uniqueIndex:username_index"`
+	APIToken  string `gorm:"not null"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// TableName hard code table name
+func (sqlUserEntry) TableName() string {
+	return "users"
+}
+
+// String override String
+func (t sqlUserEntry) String() string {
+	return fmt.Sprintf("(%s [%s])", t.Name, t.ID)
+}
+
+// sqlUserHandle wrapper object for working with the "users" table
+type sqlUserHandle struct {
+	goutils.Component
+	driver *sqlPersistance
+	sqlUserEntry
+}
+
+/*
+GetID query for user GetID
+
+	@param ctxt context.Context - query context
+	@return the user ID
+*/
+func (h *sqlUserHandle) GetID(ctxt context.Context) (string, error) {
+	return h.ID, nil
+}
+
+/*
+GetName query for user name
+
+	@param ctxt context.Context - query context
+	@return the user name
+*/
+func (h *sqlUserHandle) GetName(ctxt context.Context) (string, error) {
+	return h.Name, nil
+}
+
+/*
+SetName set user name
+
+	@param ctxt context.Context - query context
+	@param newName string - new user name
+*/
+func (h *sqlUserHandle) SetName(ctxt context.Context, newName string) error {
+	logtags := h.GetLogTagsForContext(ctxt)
+	return h.driver.db.Transaction(func(tx *gorm.DB) error {
+		tmp := tx.Model(&h.sqlUserEntry).Updates(&sqlUserEntry{Name: newName}).First(&h.sqlUserEntry)
+		if tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Failed to update user '%s' name to '%s'", h.ID, newName)
+			return tmp.Error
+		}
+		return nil
+	})
+}
+
+/*
+GetAPIToken get user API token
+
+	@param ctxt context.Context - query context
+	@return the user API token
+*/
+func (h *sqlUserHandle) GetAPIToken(ctxt context.Context) (string, error) {
+	return h.APIToken, nil
+}
+
+/*
+SetAPIToken set user API token
+
+	@param ctxt context.Context - query context
+	@param newToken string - new API token
+*/
+func (h *sqlUserHandle) SetAPIToken(ctxt context.Context, newToken string) error {
+	logtags := h.GetLogTagsForContext(ctxt)
+	return h.driver.db.Transaction(func(tx *gorm.DB) error {
+		tmp := tx.Model(&h.sqlUserEntry).Updates(&sqlUserEntry{APIToken: newToken}).First(&h.sqlUserEntry)
+		if tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Failed to update user '%s' API token", h.ID)
+			return tmp.Error
+		}
+		return nil
+	})
+}
+
+/*
+ChatSessionManager fetch chat session manager for a user
+
+	@param ctxt context.Context - query context
+	@return associated chat session manager
+*/
+func (h *sqlUserHandle) ChatSessionManager(ctxt context.Context) (ChatSessionManager, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// ============================================================================================
+// SQL User Manager implementation
+
+/*
+RecordNewUser record a new system user
+
+	@param ctxt context.Context - query context
+	@param userName string - user name
+	@return	new user entry
+*/
+func (c *sqlPersistance) RecordNewUser(ctxt context.Context, userName string) (User, error) {
+	logtags := c.GetLogTagsForContext(ctxt)
+	var result sqlUserHandle
+	return &result, c.db.Transaction(func(tx *gorm.DB) error {
+		log.WithFields(logtags).Debugf("Defining new user entry for '%s'", userName)
+
+		// Define a new user entry
+		newEntry := sqlUserEntry{ID: uuid.New().String(), Name: userName, APIToken: ""}
+		if tmp := tx.Create(&newEntry); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Failed to define new entry for '%s'", userName)
+			return tmp.Error
+		}
+
+		log.WithFields(logtags).Debugf("Defined new user entry for '%s'", userName)
+
+		// Prepare wrapper object
+		logtags["user"] = newEntry.String()
+		result.Component = goutils.Component{
+			LogTags:         logtags,
+			LogTagModifiers: []goutils.LogMetadataModifier{},
+		}
+		result.driver = c
+		result.sqlUserEntry = newEntry
+		return nil
+	})
+}
+
+/*
+ListUsers list all known users
+
+	@param ctxt context.Context - query context
+	@return list of known users
+*/
+func (c *sqlPersistance) ListUsers(ctxt context.Context) ([]User, error) {
+	logtags := c.GetLogTagsForContext(ctxt)
+	result := []User{}
+	return result, c.db.Transaction(func(tx *gorm.DB) error {
+		var dbEntries []sqlUserEntry
+
+		if tmp := tx.Find(&dbEntries); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Error("Failed to list all users")
+			return tmp.Error
+		}
+
+		// Create the wrapper objects
+		for _, userEntry := range dbEntries {
+			lclLogtags := c.GetLogTagsForContext(ctxt)
+			lclLogtags["user"] = userEntry.String()
+			result = append(result, &sqlUserHandle{
+				Component: goutils.Component{
+					LogTags:         lclLogtags,
+					LogTagModifiers: []goutils.LogMetadataModifier{},
+				},
+				driver:       c,
+				sqlUserEntry: userEntry,
+			})
+		}
+
+		return nil
+	})
+}
+
+/*
+GetUser fetch a user
+
+	@param ctxt context.Context - query context
+	@param userID string - user ID
+	@return user entry
+*/
+func (c *sqlPersistance) GetUser(ctxt context.Context, userID string) (User, error) {
+	logtags := c.GetLogTagsForContext(ctxt)
+	var result sqlUserHandle
+	return &result, c.db.Transaction(func(tx *gorm.DB) error {
+		var dbEntry sqlUserEntry
+
+		if tmp := tx.Where(&sqlUserEntry{ID: userID}).First(&dbEntry); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Unable to locate user '%s'", userID)
+			return tmp.Error
+		}
+
+		// Prepare wrapper object
+		logtags["user"] = dbEntry.String()
+		result.Component = goutils.Component{
+			LogTags:         logtags,
+			LogTagModifiers: []goutils.LogMetadataModifier{},
+		}
+		result.driver = c
+		result.sqlUserEntry = dbEntry
+		return nil
+	})
+}
+
+/*
+GetUser fetch a user by name
+
+	@param ctxt context.Context - query context
+	@param userName string - user name
+	@return user entry
+*/
+func (c *sqlPersistance) GetUserByName(ctxt context.Context, userName string) (User, error) {
+	logtags := c.GetLogTagsForContext(ctxt)
+	var result sqlUserHandle
+	return &result, c.db.Transaction(func(tx *gorm.DB) error {
+		var dbEntry sqlUserEntry
+
+		if tmp := tx.Where(&sqlUserEntry{Name: userName}).First(&dbEntry); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Unable to locate user named '%s'", userName)
+			return tmp.Error
+		}
+
+		// Prepare wrapper object
+		logtags["user"] = dbEntry.String()
+		result.Component = goutils.Component{
+			LogTags:         logtags,
+			LogTagModifiers: []goutils.LogMetadataModifier{},
+		}
+		result.driver = c
+		result.sqlUserEntry = dbEntry
+		return nil
+	})
+}
+
+/*
+DeleteUser delete a user
+
+	@param ctxt context.Context - query context
+	@param userID string - user ID
+*/
+func (c *sqlPersistance) DeleteUser(ctxt context.Context, userID string) error {
+	logtags := c.GetLogTagsForContext(ctxt)
+	return c.db.Transaction(func(tx *gorm.DB) error {
+		if tmp := tx.Where(&sqlUserEntry{ID: userID}).Delete(&sqlUserEntry{}); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Unable to delete user '%s'", userID)
+			return tmp.Error
+		}
+
+		return nil
+	})
+}
