@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/google/uuid"
@@ -205,5 +206,101 @@ func TestSQLChatSession(t *testing.T) {
 			FrequencyPenalty: &newFreqPen,
 		}
 		assert.NotNil(uut.ChangeSettings(utContext, newSetting))
+	}
+}
+
+func TestSQLChatExchange(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
+	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
+
+	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB))
+	assert.Nil(err)
+
+	utContext := context.Background()
+
+	// Create test user
+	user0, err := userManager.RecordNewUser(utContext, "unit-tester-0")
+	assert.Nil(err)
+
+	// Create chat manager
+	chatManager, err := user0.ChatSessionManager(utContext)
+	assert.Nil(err)
+
+	// Create session
+	model0 := uuid.NewString()
+	uut, err := chatManager.NewSession(utContext, model0)
+	assert.Nil(err)
+	{
+		model, err := uut.CurrentModel(utContext)
+		assert.Nil(err)
+		assert.Equal(model0, model)
+	}
+
+	currentTime := time.Now()
+	timeDelta := time.Second * 5
+
+	// Case 0: record exchange
+	exchange0 := ChatExchange{
+		RequestTimestamp:  currentTime,
+		Request:           fmt.Sprintf("req-0-%s", uuid.NewString()),
+		ResponseTimestamp: currentTime.Add(timeDelta),
+		Response:          fmt.Sprintf("resp-0-%s", uuid.NewString()),
+	}
+	assert.Nil(uut.RecordOneExchange(utContext, exchange0))
+	{
+		exchanges, err := uut.Exchanges(utContext)
+		assert.Nil(err)
+		assert.Len(exchanges, 1)
+		assert.Equal(exchange0.Request, exchanges[0].Request)
+		assert.Equal(exchange0.Response, exchanges[0].Response)
+	}
+
+	// Case 1: record exchange
+	currentTime = currentTime.Add(timeDelta)
+	exchange1 := ChatExchange{
+		RequestTimestamp:  currentTime,
+		Request:           fmt.Sprintf("req-1-%s", uuid.NewString()),
+		ResponseTimestamp: currentTime.Add(timeDelta),
+		Response:          fmt.Sprintf("resp-1-%s", uuid.NewString()),
+	}
+	assert.Nil(uut.RecordOneExchange(utContext, exchange1))
+	{
+		exchanges, err := uut.Exchanges(utContext)
+		assert.Nil(err)
+		assert.Len(exchanges, 2)
+		assert.Equal(exchange1.Request, exchanges[1].Request)
+		assert.Equal(exchange1.Response, exchanges[1].Response)
+	}
+	{
+		firstExchange, err := uut.FirstExchange(utContext)
+		assert.Nil(err)
+		assert.Equal(exchange0.Request, firstExchange.Request)
+		assert.Equal(exchange0.Response, firstExchange.Response)
+	}
+
+	// Case 2: record earlier exchange
+	currentTime = currentTime.Add(timeDelta * -4)
+	exchange2 := ChatExchange{
+		RequestTimestamp:  currentTime,
+		Request:           fmt.Sprintf("req-2-%s", uuid.NewString()),
+		ResponseTimestamp: currentTime.Add(timeDelta),
+		Response:          fmt.Sprintf("resp-2-%s", uuid.NewString()),
+	}
+	assert.Nil(uut.RecordOneExchange(utContext, exchange2))
+	{
+		exchanges, err := uut.Exchanges(utContext)
+		assert.Nil(err)
+		assert.Len(exchanges, 3)
+		assert.Equal(exchange1.Request, exchanges[2].Request)
+		assert.Equal(exchange1.Response, exchanges[2].Response)
+	}
+	{
+		firstExchange, err := uut.FirstExchange(utContext)
+		assert.Nil(err)
+		assert.Equal(exchange2.Request, firstExchange.Request)
+		assert.Equal(exchange2.Response, firstExchange.Response)
 	}
 }
