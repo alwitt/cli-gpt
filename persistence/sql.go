@@ -9,9 +9,16 @@ import (
 )
 
 // SQL persistance layer driver
-type sqlPersistance struct {
+type sqlUserPersistance struct {
 	goutils.Component
 	db *gorm.DB
+}
+
+// SQL persistance layer driver specific to chat session management
+type sqlChatPersistance struct {
+	goutils.Component
+	db   *gorm.DB
+	user User
 }
 
 /*
@@ -40,9 +47,15 @@ func GetSQLUserManager(dbDialector gorm.Dialector) (UserManager, error) {
 	if err := db.AutoMigrate(&sqlUserEntry{}); err != nil {
 		return nil, err
 	}
+	if err := db.AutoMigrate(&sqlChatSessionEntry{}); err != nil {
+		return nil, err
+	}
+	if err := db.AutoMigrate(&sqlChatExchangeEntry{}); err != nil {
+		return nil, err
+	}
 
 	logTags := log.Fields{"module": "persistence", "component": "user-manager", "instance": "sql"}
-	return &sqlPersistance{
+	return &sqlUserPersistance{
 		Component: goutils.Component{
 			LogTags:         logTags,
 			LogTagModifiers: []goutils.LogMetadataModifier{},

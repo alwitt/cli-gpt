@@ -13,11 +13,12 @@ import (
 
 // sqlUserEntry SQL table representing a user
 type sqlUserEntry struct {
-	ID        string `gorm:"primaryKey"`
-	Name      string `gorm:"not null;uniqueIndex:username_index"`
-	APIToken  string `gorm:"not null"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           string                `gorm:"primaryKey"`
+	Name         string                `gorm:"not null;uniqueIndex:username_index"`
+	APIToken     string                `gorm:"not null"`
+	ChatSessions []sqlChatSessionEntry `gorm:"foreignKey:UserID"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // TableName hard code table name
@@ -33,7 +34,7 @@ func (t sqlUserEntry) String() string {
 // sqlUserHandle wrapper object for working with the "users" table
 type sqlUserHandle struct {
 	goutils.Component
-	driver *sqlPersistance
+	driver *sqlUserPersistance
 	sqlUserEntry
 }
 
@@ -116,11 +117,35 @@ ChatSessionManager fetch chat session manager for a user
 	@return associated chat session manager
 */
 func (h *sqlUserHandle) ChatSessionManager(ctxt context.Context) (ChatSessionManager, error) {
-	return nil, fmt.Errorf("not implemented")
+	logtags := h.GetLogTagsForContext(ctxt)
+	logtags["table"] = "chat_sessions"
+	return &sqlChatPersistance{
+		Component: goutils.Component{
+			LogTags:         logtags,
+			LogTagModifiers: []goutils.LogMetadataModifier{},
+		},
+		db:   h.driver.db,
+		user: h,
+	}, nil
 }
 
 // ============================================================================================
 // SQL User Manager implementation
+
+// defineUserHandle helper function for defining new user handle object
+func (c *sqlUserPersistance) defineUserHandle(ctxt context.Context, userEntry sqlUserEntry) sqlUserHandle {
+	logtags := c.GetLogTagsForContext(ctxt)
+	logtags["table"] = "users"
+	logtags["user"] = userEntry.String()
+	return sqlUserHandle{
+		Component: goutils.Component{
+			LogTags:         logtags,
+			LogTagModifiers: []goutils.LogMetadataModifier{},
+		},
+		driver:       c,
+		sqlUserEntry: userEntry,
+	}
+}
 
 /*
 RecordNewUser record a new system user
@@ -129,7 +154,7 @@ RecordNewUser record a new system user
 	@param userName string - user name
 	@return	new user entry
 */
-func (c *sqlPersistance) RecordNewUser(ctxt context.Context, userName string) (User, error) {
+func (c *sqlUserPersistance) RecordNewUser(ctxt context.Context, userName string) (User, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	var result sqlUserHandle
 	return &result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -148,13 +173,7 @@ func (c *sqlPersistance) RecordNewUser(ctxt context.Context, userName string) (U
 		log.WithFields(logtags).Debugf("Defined new user entry for '%s'", userName)
 
 		// Prepare wrapper object
-		logtags["user"] = newEntry.String()
-		result.Component = goutils.Component{
-			LogTags:         logtags,
-			LogTagModifiers: []goutils.LogMetadataModifier{},
-		}
-		result.driver = c
-		result.sqlUserEntry = newEntry
+		result = c.defineUserHandle(ctxt, newEntry)
 		return nil
 	})
 }
@@ -165,7 +184,7 @@ ListUsers list all known users
 	@param ctxt context.Context - query context
 	@return list of known users
 */
-func (c *sqlPersistance) ListUsers(ctxt context.Context) ([]User, error) {
+func (c *sqlUserPersistance) ListUsers(ctxt context.Context) ([]User, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	result := []User{}
 	return result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -181,16 +200,8 @@ func (c *sqlPersistance) ListUsers(ctxt context.Context) ([]User, error) {
 
 		// Create the wrapper objects
 		for _, userEntry := range dbEntries {
-			lclLogtags := c.GetLogTagsForContext(ctxt)
-			lclLogtags["user"] = userEntry.String()
-			result = append(result, &sqlUserHandle{
-				Component: goutils.Component{
-					LogTags:         lclLogtags,
-					LogTagModifiers: []goutils.LogMetadataModifier{},
-				},
-				driver:       c,
-				sqlUserEntry: userEntry,
-			})
+			handleObject := c.defineUserHandle(ctxt, userEntry)
+			result = append(result, &handleObject)
 		}
 
 		return nil
@@ -204,7 +215,7 @@ GetUser fetch a user
 	@param userID string - user ID
 	@return user entry
 */
-func (c *sqlPersistance) GetUser(ctxt context.Context, userID string) (User, error) {
+func (c *sqlUserPersistance) GetUser(ctxt context.Context, userID string) (User, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	var result sqlUserHandle
 	return &result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -219,13 +230,7 @@ func (c *sqlPersistance) GetUser(ctxt context.Context, userID string) (User, err
 		}
 
 		// Prepare wrapper object
-		logtags["user"] = dbEntry.String()
-		result.Component = goutils.Component{
-			LogTags:         logtags,
-			LogTagModifiers: []goutils.LogMetadataModifier{},
-		}
-		result.driver = c
-		result.sqlUserEntry = dbEntry
+		result = c.defineUserHandle(ctxt, dbEntry)
 		return nil
 	})
 }
@@ -237,7 +242,7 @@ GetUser fetch a user by name
 	@param userName string - user name
 	@return user entry
 */
-func (c *sqlPersistance) GetUserByName(ctxt context.Context, userName string) (User, error) {
+func (c *sqlUserPersistance) GetUserByName(ctxt context.Context, userName string) (User, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	var result sqlUserHandle
 	return &result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -252,13 +257,7 @@ func (c *sqlPersistance) GetUserByName(ctxt context.Context, userName string) (U
 		}
 
 		// Prepare wrapper object
-		logtags["user"] = dbEntry.String()
-		result.Component = goutils.Component{
-			LogTags:         logtags,
-			LogTagModifiers: []goutils.LogMetadataModifier{},
-		}
-		result.driver = c
-		result.sqlUserEntry = dbEntry
+		result = c.defineUserHandle(ctxt, dbEntry)
 		return nil
 	})
 }
@@ -269,7 +268,7 @@ DeleteUser delete a user
 	@param ctxt context.Context - query context
 	@param userID string - user ID
 */
-func (c *sqlPersistance) DeleteUser(ctxt context.Context, userID string) error {
+func (c *sqlUserPersistance) DeleteUser(ctxt context.Context, userID string) error {
 	logtags := c.GetLogTagsForContext(ctxt)
 	return c.db.Transaction(func(tx *gorm.DB) error {
 		if tmp := tx.Where(&sqlUserEntry{ID: userID}).Delete(&sqlUserEntry{}); tmp.Error != nil {

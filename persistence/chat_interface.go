@@ -9,6 +9,9 @@ import (
 type ChatSessionState string
 
 const (
+	// DefaultChatMaxResponseTokens default max token count for chat session response
+	DefaultChatMaxResponseTokens = 2048
+
 	// ChatSessionStateOpen ENUM for chat session state "OPEN"
 	ChatSessionStateOpen ChatSessionState = "session-open"
 	// ChatSessionStateClose ENUM for chat session state "CLOSE"
@@ -21,13 +24,13 @@ ChatSessionParameters common API request parameters used for one chat session
 See https://platform.openai.com/docs/api-reference/completions/create for explanations
 */
 type ChatSessionParameters struct {
-	Suffix           *string
-	MaxTokens        int
-	Temperature      *float32 `validate:"omitempty,gte=0,lte=2"`
-	TopP             *float32 `validate:"omitempty,gte=0,lte=1"`
-	Stop             []string `validate:"omitempty,lte=4"`
-	PresencePenalty  *float32 `validate:"omitempty,gte=-2,lte=2"`
-	FrequencyPenalty *float32 `validate:"omitempty,gte=-2,lte=2"`
+	Suffix           *string  `json:"suffix,omitempty"`
+	MaxTokens        int      `json:"max_tokens"`
+	Temperature      *float32 `json:"temperature,omitempty" validate:"omitempty,gte=0,lte=2"`
+	TopP             *float32 `json:"top_p,omitempty" validate:"omitempty,gte=0,lte=1"`
+	Stop             []string `json:"stop,omitempty" validate:"omitempty,lte=4"`
+	PresencePenalty  *float32 `json:"presence_penalty,omitempty" validate:"omitempty,gte=-2,lte=2"`
+	FrequencyPenalty *float32 `json:"frequency_penalty,omitempty" validate:"omitempty,gte=-2,lte=2"`
 }
 
 /*
@@ -62,7 +65,7 @@ type ChatSession interface {
 			@param ctxt context.Context - query context
 			@return current session state
 	*/
-	SessionState(ctxt context.Context) (ChatSessionParameters, error)
+	SessionState(ctxt context.Context) (ChatSessionState, error)
 
 	/*
 		CloseSession close this chat session
@@ -88,12 +91,12 @@ type ChatSession interface {
 	CurrentModel(ctxt context.Context) (string, error)
 
 	/*
-		SelectModel change to model for the session
+		ChangeModel change to model for the session
 
 			@param ctxt context.Context - query context
 			@param newModel string - the name of the new model
 	*/
-	SelectModel(ctxt context.Context, newModel string) error
+	ChangeModel(ctxt context.Context, newModel string) error
 
 	/*
 		Settings returns the current session wide API request parameters
@@ -122,6 +125,14 @@ type ChatSession interface {
 	RecordOneExchange(ctxt context.Context, exchange ChatExchange) error
 
 	/*
+		FirstExchange get the first session exchange
+
+			@param ctxt context.Context - query context
+			@return chat exchange
+	*/
+	FirstExchange(ctxt context.Context) (ChatExchange, error)
+
+	/*
 		Exchanges fetch the list of exchanges recorded in this session.
 
 		The exchanges are sorted by chronological order.
@@ -140,9 +151,10 @@ type ChatSessionManager interface {
 		NewSession define a new chat session
 
 			@param ctxt context.Context - query context
+			@param model stirng - OpenAI model name
 			@return	new chat session
 	*/
-	NewSession(ctxt context.Context) (ChatSession, error)
+	NewSession(ctxt context.Context, model string) (ChatSession, error)
 
 	/*
 		ListSessions list all sessions
