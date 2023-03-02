@@ -434,6 +434,68 @@ func (c *sqlChatPersistance) GetSession(ctxt context.Context, sessionID string) 
 }
 
 /*
+CurrentActiveSession get the current active chat session for the associated user
+
+	@param ctxt context.Context - query context
+	@return session entry
+*/
+func (c *sqlChatPersistance) CurrentActiveSession(ctxt context.Context) (ChatSession, error) {
+	logtags := c.GetLogTagsForContext(ctxt)
+	var result *sqlChatSessionHandle = nil
+	return result, c.db.Transaction(func(tx *gorm.DB) error {
+		var entry sqlChatSessionEntry
+
+		activeSessionID, err := c.user.GetActiveSessionID(ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to read user's active session ID")
+		}
+
+		if activeSessionID == nil {
+			// The user has no active sessions
+			log.WithFields(logtags).Debug("User has no active sessions")
+			return nil
+		}
+
+		userID, err := c.user.GetID(ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Unable to get associated user ID")
+			return err
+		}
+
+		if tmp := tx.
+			Where(&sqlChatSessionEntry{UserID: userID, ID: *activeSessionID}).
+			First(&entry); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Failed to query entry for session '%s'", *activeSessionID)
+			return tmp.Error
+		}
+
+		// Prepare wrapper object
+		tmp := c.defineSessionHandle(ctxt, entry)
+		result = &tmp
+		return nil
+	})
+}
+
+/*
+SetActiveSession set the current active chat session for the associated user
+
+	@param ctxt context.Context - query context
+	@param session ChatSession - the chat session
+*/
+func (c *sqlChatPersistance) SetActiveSession(ctxt context.Context, session ChatSession) error {
+	logtags := c.GetLogTagsForContext(ctxt)
+	sessionID, err := session.SessionID(ctxt)
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Failed to read session ID")
+		return err
+	}
+	return c.user.SetActiveSessionID(ctxt, sessionID)
+}
+
+/*
 DeleteSession delete a session
 
 	@param ctxt context.Context - query context

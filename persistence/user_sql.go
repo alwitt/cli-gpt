@@ -13,12 +13,14 @@ import (
 
 // sqlUserEntry SQL table representing a user
 type sqlUserEntry struct {
-	ID           string                `gorm:"primaryKey"`
-	Name         string                `gorm:"not null;uniqueIndex:username_index"`
-	APIToken     string                `gorm:"not null"`
-	ChatSessions []sqlChatSessionEntry `gorm:"foreignKey:UserID"`
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              string                `gorm:"primaryKey"`
+	Name            string                `gorm:"not null;uniqueIndex:username_index"`
+	APIToken        string                `gorm:"not null"`
+	ActiveSessionID *string               `gorm:"default:null"`
+	ActiveSession   *sqlChatSessionEntry  `gorm:"foreignKey:ActiveSessionID"`
+	ChatSessions    []sqlChatSessionEntry `gorm:"foreignKey:UserID"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // TableName hard code table name
@@ -73,6 +75,39 @@ func (h *sqlUserHandle) SetName(ctxt context.Context, newName string) error {
 				WithError(tmp.Error).
 				WithFields(logtags).
 				Errorf("Failed to update user '%s' name to '%s'", h.ID, newName)
+			return tmp.Error
+		}
+		return nil
+	})
+}
+
+/*
+GetActiveSessionID fetch user's active session ID
+
+	@param ctxt context.Context - query context
+	@return active session ID
+*/
+func (h *sqlUserHandle) GetActiveSessionID(ctxt context.Context) (*string, error) {
+	return h.ActiveSessionID, nil
+}
+
+/*
+SetActiveSessionID change user's active session ID
+
+	@param ctxt context.Context - query context
+	@param sessionID string - new session ID
+*/
+func (h *sqlUserHandle) SetActiveSessionID(ctxt context.Context, sessionID string) error {
+	logtags := h.GetLogTagsForContext(ctxt)
+	return h.driver.db.Transaction(func(tx *gorm.DB) error {
+		if tmp := tx.
+			Model(&h.sqlUserEntry).
+			Updates(&sqlUserEntry{ActiveSessionID: &sessionID}).
+			First(&h.sqlUserEntry); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Failed to update user '%s' active session to '%s'", h.ID, sessionID)
 			return tmp.Error
 		}
 		return nil

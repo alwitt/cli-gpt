@@ -111,6 +111,74 @@ func TestSQLChatManager(t *testing.T) {
 	}
 }
 
+func TestSQLUserActiveSessionSet(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
+	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
+
+	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB))
+	assert.Nil(err)
+
+	utContext := context.Background()
+
+	// Create test user
+	user0, err := userManager.RecordNewUser(utContext, "unit-tester-0")
+	assert.Nil(err)
+
+	// Case 0: no active session
+	{
+		activeSession, err := user0.GetActiveSessionID(utContext)
+		assert.Nil(err)
+		assert.Nil(activeSession)
+	}
+
+	// Case 1: unknown session
+	assert.NotNil(user0.SetActiveSessionID(utContext, uuid.NewString()))
+
+	// Create chat manager
+	chatManager, err := user0.ChatSessionManager(utContext)
+	assert.Nil(err)
+
+	// Create session
+	session0, err := chatManager.NewSession(utContext, uuid.NewString())
+	assert.Nil(err)
+
+	// Case 2: link session
+	sessionID0, err := session0.SessionID(utContext)
+	assert.Nil(err)
+	assert.Nil(user0.SetActiveSessionID(utContext, sessionID0))
+	{
+		activeSession, err := user0.GetActiveSessionID(utContext)
+		assert.Nil(err)
+		assert.Equal(sessionID0, *activeSession)
+	}
+
+	// Case 3: check from the session manager side
+	{
+		activeSession, err := chatManager.CurrentActiveSession(utContext)
+		assert.Nil(err)
+		sessionID, err := activeSession.SessionID(utContext)
+		assert.Nil(err)
+		assert.Equal(sessionID0, sessionID)
+	}
+
+	// Create session
+	session1, err := chatManager.NewSession(utContext, uuid.NewString())
+	assert.Nil(err)
+
+	// Case 4: link session through session manager
+	assert.Nil(chatManager.SetActiveSession(utContext, session1))
+	{
+		sessionID1, err := session1.SessionID(utContext)
+		assert.Nil(err)
+		activeSession, err := user0.GetActiveSessionID(utContext)
+		assert.Nil(err)
+		assert.Equal(sessionID1, *activeSession)
+	}
+}
+
 func TestSQLChatSession(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)

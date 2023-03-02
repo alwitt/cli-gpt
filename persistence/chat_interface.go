@@ -174,6 +174,22 @@ type ChatSessionManager interface {
 	GetSession(ctxt context.Context, sessionID string) (ChatSession, error)
 
 	/*
+	   CurrentActiveSession get the current active chat session for the associated user
+
+	   	@param ctxt context.Context - query context
+	   	@return session entry
+	*/
+	CurrentActiveSession(ctxt context.Context) (ChatSession, error)
+
+	/*
+	   SetActiveSession set the current active chat session for the associated user
+
+	   	@param ctxt context.Context - query context
+	   	@param session ChatSession - the chat session
+	*/
+	SetActiveSession(ctxt context.Context, session ChatSession) error
+
+	/*
 		DeleteSession delete a session
 
 			@param ctxt context.Context - query context

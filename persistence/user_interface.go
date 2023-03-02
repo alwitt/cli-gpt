@@ -37,6 +37,22 @@ type User interface {
 	SetName(ctxt context.Context, newName string) error
 
 	/*
+		GetActiveSessionID fetch user's active session ID
+
+			@param ctxt context.Context - query context
+			@return active session ID
+	*/
+	GetActiveSessionID(ctxt context.Context) (*string, error)
+
+	/*
+	   SetActiveSessionID change user's active session ID
+
+	   	@param ctxt context.Context - query context
+	   	@param sessionID string - new session ID
+	*/
+	SetActiveSessionID(ctxt context.Context, sessionID string) error
+
+	/*
 		GetAPIToken get user API token
 
 			@param ctxt context.Context - query context

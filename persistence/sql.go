@@ -1,6 +1,8 @@
 package persistence
 
 import (
+	"fmt"
+
 	"github.com/alwitt/goutils"
 	"github.com/apex/log"
 	"gorm.io/driver/sqlite"
@@ -28,7 +30,7 @@ GetSqliteDialector define Sqlite GORM dialector
 	@return GORM sqlite dialector
 */
 func GetSqliteDialector(dbFile string) gorm.Dialector {
-	return sqlite.Open(dbFile)
+	return sqlite.Open(fmt.Sprintf("%s?_foreign_keys=on", dbFile))
 }
 
 /*
