@@ -11,6 +11,7 @@ import (
 	"github.com/apex/log"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm/logger"
 )
 
 func TestConcatenateChatPromptBuilder(t *testing.T) {
@@ -20,7 +21,9 @@ func TestConcatenateChatPromptBuilder(t *testing.T) {
 	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
 	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
 
-	userManager, err := persistence.GetSQLUserManager(persistence.GetSqliteDialector(testDB))
+	userManager, err := persistence.GetSQLUserManager(
+		persistence.GetSqliteDialector(testDB), logger.Info,
+	)
 	assert.Nil(err)
 
 	utContext := context.Background()

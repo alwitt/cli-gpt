@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm/logger"
 )
 
 func TestSQLChatManager(t *testing.T) {
@@ -19,7 +20,7 @@ func TestSQLChatManager(t *testing.T) {
 	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
 	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
 
-	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB))
+	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB), logger.Info)
 	assert.Nil(err)
 
 	utContext := context.Background()
@@ -118,7 +119,7 @@ func TestSQLUserActiveSessionSet(t *testing.T) {
 	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
 	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
 
-	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB))
+	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB), logger.Info)
 	assert.Nil(err)
 
 	utContext := context.Background()
@@ -186,7 +187,7 @@ func TestSQLChatSession(t *testing.T) {
 	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
 	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
 
-	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB))
+	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB), logger.Info)
 	assert.Nil(err)
 
 	utContext := context.Background()
@@ -284,7 +285,7 @@ func TestSQLChatExchange(t *testing.T) {
 	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
 	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
 
-	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB))
+	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB), logger.Info)
 	assert.Nil(err)
 
 	utContext := context.Background()

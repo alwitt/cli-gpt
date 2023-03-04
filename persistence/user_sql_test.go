@@ -8,6 +8,7 @@ import (
 	"github.com/apex/log"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm/logger"
 )
 
 func TestSQLUserManager(t *testing.T) {
@@ -17,7 +18,7 @@ func TestSQLUserManager(t *testing.T) {
 	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
 	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
 
-	uut, err := GetSQLUserManager(GetSqliteDialector(testDB))
+	uut, err := GetSQLUserManager(GetSqliteDialector(testDB), logger.Info)
 	assert.Nil(err)
 
 	utContext := context.Background()
@@ -87,7 +88,7 @@ func TestSQLUserEntryCRUD(t *testing.T) {
 	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
 	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
 
-	uut, err := GetSQLUserManager(GetSqliteDialector(testDB))
+	uut, err := GetSQLUserManager(GetSqliteDialector(testDB), logger.Info)
 	assert.Nil(err)
 
 	utContext := context.Background()

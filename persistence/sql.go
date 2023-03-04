@@ -35,10 +35,13 @@ func GetSqliteDialector(dbFile string) gorm.Dialector {
 
 /*
 GetSQLUserManager define a new SQL based user manager
+
+	@param dbDialector gorm.Dialector - GORM SQL dialector
+	@param logLevel logger.LogLevel - SQL log level
 */
-func GetSQLUserManager(dbDialector gorm.Dialector) (UserManager, error) {
+func GetSQLUserManager(dbDialector gorm.Dialector, logLevel logger.LogLevel) (UserManager, error) {
 	db, err := gorm.Open(dbDialector, &gorm.Config{
-		Logger:                 logger.Default.LogMode(logger.Info),
+		Logger:                 logger.Default.LogMode(logLevel),
 		SkipDefaultTransaction: true,
 	})
 	if err != nil {
