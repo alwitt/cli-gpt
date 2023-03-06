@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/alwitt/cli-gpt/persistence"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
+	"github.com/manifoldco/promptui"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 )
@@ -55,6 +57,98 @@ func (c *startNewChatActionCLIArgs) getCLIFlags() []cli.Flag {
 
 var startNewChatParams startNewChatActionCLIArgs
 
+// Helper function to ask user for request parameters if settings file not provided
+func askUserForChatRequestOptions() (persistence.ChatSessionParameters, error) {
+	result := persistence.ChatSessionParameters{}
+
+	var err error
+	// Ask for model
+	modelPrompt := promptui.Select{
+		Label: "Select request model",
+		Items: []string{"davinci", "curie", "babbage", "ada"},
+	}
+	if _, result.Model, err = modelPrompt.Run(); err != nil {
+		return result, err
+	}
+
+	// Ask for max token
+	maxTokenPrompt := promptui.Prompt{
+		Label:   "Max tokens per response",
+		Default: "2048",
+	}
+	if maxTokenStr, err := maxTokenPrompt.Run(); err != nil {
+		return result, err
+	} else if result.MaxTokens, err = strconv.Atoi(maxTokenStr); err != nil {
+		return result, err
+	}
+
+	// Ask for temperature
+	temperaturePrompt := promptui.Prompt{
+		Label:   "Request temperature",
+		Default: "0.8",
+	}
+	if temperatureStr, err := temperaturePrompt.Run(); err != nil {
+		return result, err
+	} else if temp64, err := strconv.ParseFloat(temperatureStr, 32); err != nil {
+		return result, err
+	} else {
+		temp32 := float32(temp64)
+		result.Temperature = &temp32
+	}
+
+	// Ask for TopP
+	toppPrompt := promptui.Prompt{
+		Label:   "Request TopP",
+		Default: "0",
+	}
+	if toppStr, err := toppPrompt.Run(); err != nil {
+		return result, err
+	} else if temp64, err := strconv.ParseFloat(toppStr, 32); err != nil {
+		return result, err
+	} else {
+		temp32 := float32(temp64)
+		result.TopP = &temp32
+	}
+
+	// Ask for Presence Penalty
+	presencePenaltyPrompt := promptui.Prompt{
+		Label:   "Request Presence Penalty",
+		Default: "",
+	}
+	if presencePenaltyStr, err := presencePenaltyPrompt.Run(); err != nil {
+		return result, err
+	} else if len(presencePenaltyStr) > 0 {
+		temp64, err := strconv.ParseFloat(presencePenaltyStr, 32)
+		if err != nil {
+			return result, err
+		}
+		temp32 := float32(temp64)
+		result.PresencePenalty = &temp32
+	} else {
+		result.PresencePenalty = nil
+	}
+
+	// Ask for Frequency Penalty
+	frequencyPenaltyPrompt := promptui.Prompt{
+		Label:   "Request Frequency Penalty",
+		Default: "",
+	}
+	if frequencyPenaltyStr, err := frequencyPenaltyPrompt.Run(); err != nil {
+		return result, err
+	} else if len(frequencyPenaltyStr) > 0 {
+		temp64, err := strconv.ParseFloat(frequencyPenaltyStr, 32)
+		if err != nil {
+			return result, err
+		}
+		temp32 := float32(temp64)
+		result.FrequencyPenalty = &temp32
+	} else {
+		result.FrequencyPenalty = nil
+	}
+
+	return result, nil
+}
+
 /*
 actionStartNewChat start a new chat session
 
@@ -84,7 +178,6 @@ func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 
 		// Parse the new chat setting config
 		var newSetting persistence.ChatSessionParameters
-		providedSetting := false
 		if len(args.SettingFile) > 0 {
 			settingContent, err := os.ReadFile(args.SettingFile)
 			if err != nil {
@@ -101,7 +194,9 @@ func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 					Errorf("Unable to parse setting file '%s'", args.SettingFile)
 				return err
 			}
-			providedSetting = true
+		} else if newSetting, err = askUserForChatRequestOptions(); err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to prompt user for parameters")
+			return err
 		}
 
 		// Create new chat session
@@ -116,25 +211,23 @@ func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 			return err
 		}
 
-		if providedSetting {
-			// Get current settings
-			currentSetting, err := session.Settings(app.ctxt)
-			if err != nil {
-				log.
-					WithError(err).
-					WithFields(logtags).
-					Errorf("Unable to read chat session '%s' settings", sessionID)
-				return err
-			}
+		// Get current settings
+		currentSetting, err := session.Settings(app.ctxt)
+		if err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Unable to read chat session '%s' settings", sessionID)
+			return err
+		}
 
-			// Merge the new setting into the existing setting
-			currentSetting.MergeWithNewSettings(newSetting)
+		// Merge the new setting into the existing setting
+		currentSetting.MergeWithNewSettings(newSetting)
 
-			// Store the updated setting
-			if err := session.ChangeSettings(app.ctxt, currentSetting); err != nil {
-				log.WithError(err).WithFields(logtags).Error("Failed to apply new session setting")
-				return err
-			}
+		// Store the updated setting
+		if err := session.ChangeSettings(app.ctxt, currentSetting); err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to apply new session setting")
+			return err
 		}
 
 		// Make the first exchange
