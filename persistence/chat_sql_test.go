@@ -43,7 +43,7 @@ func TestSQLChatManager(t *testing.T) {
 	}
 
 	// Case 2: create new session
-	model0 := uuid.NewString()
+	model0 := "babbage"
 	session0, err := chatMgmt0.NewSession(utContext, model0)
 	assert.Nil(err)
 	sessionID0, err := session0.SessionID(utContext)
@@ -51,9 +51,9 @@ func TestSQLChatManager(t *testing.T) {
 	{
 		aSession, err := chatMgmt0.GetSession(utContext, sessionID0)
 		assert.Nil(err)
-		model, err := aSession.CurrentModel(utContext)
+		setting, err := aSession.Settings(utContext)
 		assert.Nil(err)
-		assert.Equal(model0, model)
+		assert.Equal(model0, setting.Model)
 		sessions, err := chatMgmt0.ListSessions(utContext)
 		assert.Nil(err)
 		assert.Len(sessions, 1)
@@ -66,7 +66,7 @@ func TestSQLChatManager(t *testing.T) {
 	assert.Nil(err)
 
 	// Case 3: create new session
-	model1 := uuid.NewString()
+	model1 := "ada"
 	session1, err := chatMgmt1.NewSession(utContext, model1)
 	assert.Nil(err)
 	sessionID1, err := session1.SessionID(utContext)
@@ -75,9 +75,9 @@ func TestSQLChatManager(t *testing.T) {
 	{
 		aSession, err := chatMgmt1.GetSession(utContext, sessionID1)
 		assert.Nil(err)
-		model, err := aSession.CurrentModel(utContext)
+		setting, err := aSession.Settings(utContext)
 		assert.Nil(err)
-		assert.Equal(model1, model)
+		assert.Equal(model1, setting.Model)
 		sessions, err := chatMgmt1.ListSessions(utContext)
 		assert.Nil(err)
 		assert.Len(sessions, 1)
@@ -103,9 +103,9 @@ func TestSQLChatManager(t *testing.T) {
 	{
 		aSession, err := chatMgmt1.GetSession(utContext, sessionID1)
 		assert.Nil(err)
-		model, err := aSession.CurrentModel(utContext)
+		setting, err := aSession.Settings(utContext)
 		assert.Nil(err)
-		assert.Equal(model1, model)
+		assert.Equal(model1, setting.Model)
 		sessions, err := chatMgmt1.ListSessions(utContext)
 		assert.Nil(err)
 		assert.Len(sessions, 1)
@@ -208,7 +208,7 @@ func TestChatSessionParams(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 
-	testParam := getDefaultChatSessionParams()
+	testParam := getDefaultChatSessionParams("test-model")
 	{
 		assert.Equal(DefaultChatMaxResponseTokens, testParam.MaxTokens)
 		assert.Nil(testParam.Suffix)
@@ -253,13 +253,13 @@ func TestSQLChatSession(t *testing.T) {
 	assert.Nil(err)
 
 	// Case 0: create session
-	model0 := uuid.NewString()
+	model0 := "curie"
 	uut, err := chatManager.NewSession(utContext, model0)
 	assert.Nil(err)
 	{
-		model, err := uut.CurrentModel(utContext)
+		setting, err := uut.Settings(utContext)
 		assert.Nil(err)
-		assert.Equal(model0, model)
+		assert.Equal(model0, setting.Model)
 	}
 
 	// Case 1: session state
@@ -286,19 +286,11 @@ func TestSQLChatSession(t *testing.T) {
 		assert.Equal(theID, readID)
 	}
 
-	// Case 2: session model
-	model1 := uuid.NewString()
-	assert.Nil(uut.ChangeModel(utContext, model1))
-	{
-		model, err := uut.CurrentModel(utContext)
-		assert.Nil(err)
-		assert.Equal(model1, model)
-	}
-
-	// Case 3: settings
+	// Case 2: settings
 	{
 		settings, err := uut.Settings(utContext)
 		assert.Nil(err)
+		assert.Equal(model0, settings.Model)
 		assert.Equal(DefaultChatMaxResponseTokens, settings.MaxTokens)
 		assert.Nil(settings.Suffix)
 		assert.Equal(DefaultChatRequestTemperature, *settings.Temperature)
@@ -306,18 +298,6 @@ func TestSQLChatSession(t *testing.T) {
 		assert.Nil(settings.Stop)
 		assert.Nil(settings.PresencePenalty)
 		assert.Nil(settings.FrequencyPenalty)
-	}
-	{
-		newTemp := float32(0.398)
-		newSetting := ChatSessionParameters{
-			MaxTokens:   551,
-			Temperature: &newTemp,
-		}
-		assert.Nil(uut.ChangeSettings(utContext, newSetting))
-		settings, err := uut.Settings(utContext)
-		assert.Nil(err)
-		assert.Equal(551, settings.MaxTokens)
-		assert.InDelta(newTemp, *settings.Temperature, 1e-6)
 	}
 	// Invalid setting
 	{
@@ -327,6 +307,27 @@ func TestSQLChatSession(t *testing.T) {
 			FrequencyPenalty: &newFreqPen,
 		}
 		assert.NotNil(uut.ChangeSettings(utContext, newSetting))
+	}
+
+	// Case 3: change session setting
+	model1 := "davinci"
+	{
+		newTemp := float32(0.398)
+		newSetting := ChatSessionParameters{
+			Model:       model1,
+			MaxTokens:   551,
+			Temperature: &newTemp,
+		}
+		assert.Nil(uut.ChangeSettings(utContext, newSetting))
+		settings, err := uut.Settings(utContext)
+		assert.Nil(err)
+		assert.Equal(551, settings.MaxTokens)
+		assert.InDelta(newTemp, *settings.Temperature, 1e-6)
+	}
+	{
+		settings, err := uut.Settings(utContext)
+		assert.Nil(err)
+		assert.Equal(model1, settings.Model)
 	}
 }
 
@@ -351,13 +352,13 @@ func TestSQLChatExchange(t *testing.T) {
 	assert.Nil(err)
 
 	// Create session
-	model0 := uuid.NewString()
+	model0 := "ada"
 	uut, err := chatManager.NewSession(utContext, model0)
 	assert.Nil(err)
 	{
-		model, err := uut.CurrentModel(utContext)
+		setting, err := uut.Settings(utContext)
 		assert.Nil(err)
-		assert.Equal(model0, model)
+		assert.Equal(model0, setting.Model)
 	}
 
 	currentTime := time.Now()

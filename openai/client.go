@@ -107,16 +107,6 @@ func (c *clientImpl) MakeCompletionRequest(
 		return err
 	}
 
-	sessionModel, err := session.CurrentModel(ctxt)
-	if err != nil {
-		log.
-			WithError(err).
-			WithFields(logtags).
-			WithField("request_type", "completion").
-			Error("Unable to read session model to start request")
-		return err
-	}
-
 	settings, err := session.Settings(ctxt)
 	if err != nil {
 		log.
@@ -127,9 +117,24 @@ func (c *clientImpl) MakeCompletionRequest(
 		return err
 	}
 
+	// Determine the model to use
+	var requestedModel string
+	switch settings.Model {
+	case "davinci":
+		requestedModel = gogpt.GPT3TextDavinci003
+	case "curie":
+		requestedModel = gogpt.GPT3TextCurie001
+	case "babbage":
+		requestedModel = gogpt.GPT3TextBabbage001
+	case "ada":
+		requestedModel = gogpt.GPT3TextAda001
+	default:
+		requestedModel = gogpt.GPT3TextDavinci003
+	}
+
 	// Build the request
 	request := gogpt.CompletionRequest{
-		Model:     sessionModel,
+		Model:     requestedModel,
 		MaxTokens: settings.MaxTokens,
 		Prompt:    prompt,
 		Stream:    true,
@@ -168,7 +173,7 @@ func (c *clientImpl) MakeCompletionRequest(
 	log.
 		WithFields(logtags).
 		WithField("request_type", "completion").
-		Debugf("Starting new request to model '%s'", sessionModel)
+		Debugf("Starting new request to model '%s'", requestedModel)
 
 	defer close(resp)
 	for {

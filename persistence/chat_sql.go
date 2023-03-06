@@ -20,8 +20,6 @@ type sqlChatSessionEntry struct {
 	// UserID ID of the user using this chat session
 	UserID string       `gorm:"not null;index:chat_session_user_id"`
 	User   sqlUserEntry `gorm:"constraint:OnDelete:CASCADE;foreignKey:UserID"`
-	// Model the OpenAI model used
-	Model string `gorm:"not null"`
 	// CommonSettings common session parameters
 	CommonSettings ChatSessionParameters  `gorm:"not null;type:text;serializer:json"`
 	Exchanges      []sqlChatExchangeEntry `gorm:"foreignKey:SessionID"`
@@ -121,40 +119,6 @@ User query the associated user for this chat session
 */
 func (h *sqlChatSessionHandle) User(ctxt context.Context) (User, error) {
 	return h.driver.user, nil
-}
-
-/*
-CurrentModel query for currently selected text model
-
-	@param ctxt context.Context - query context
-	@return the current model name
-*/
-func (h *sqlChatSessionHandle) CurrentModel(ctxt context.Context) (string, error) {
-	return h.Model, nil
-}
-
-/*
-ChangeModel change to model for the session
-
-	@param ctxt context.Context - query context
-	@param newModel string - the name of the new model
-*/
-func (h *sqlChatSessionHandle) ChangeModel(ctxt context.Context, newModel string) error {
-	logtags := h.GetLogTagsForContext(ctxt)
-	return h.driver.db.Transaction(func(tx *gorm.DB) error {
-		tmp := tx.
-			Model(&h.sqlChatSessionEntry).
-			Updates(&sqlChatSessionEntry{Model: newModel}).
-			First(&h.sqlChatSessionEntry)
-		if tmp.Error != nil {
-			log.
-				WithError(tmp.Error).
-				WithFields(logtags).
-				Errorf("Failed to update session model to '%s'", newModel)
-			return tmp.Error
-		}
-		return nil
-	})
 }
 
 /*
@@ -364,8 +328,7 @@ func (c *sqlChatPersistance) NewSession(ctxt context.Context, model string) (Cha
 			ID:             sessionID,
 			State:          ChatSessionStateOpen,
 			UserID:         userID,
-			Model:          model,
-			CommonSettings: getDefaultChatSessionParams(),
+			CommonSettings: getDefaultChatSessionParams(model),
 		}
 		if tmp := tx.Create(&newEntry); tmp.Error != nil {
 			log.

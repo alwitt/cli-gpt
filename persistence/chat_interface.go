@@ -28,6 +28,7 @@ ChatSessionParameters common API request parameters used for one chat session
 See https://platform.openai.com/docs/api-reference/completions/create for explanations
 */
 type ChatSessionParameters struct {
+	Model            string   `yaml:"model" json:"model" validate:"required,oneof=davinci curie babbage ada"`
 	Suffix           *string  `yaml:"suffix,omitempty" json:"suffix,omitempty"`
 	MaxTokens        int      `yaml:"max_tokens" json:"max_tokens" validate:"required,gte=10,lte=4096"`
 	Temperature      *float32 `yaml:"temperature,omitempty" json:"temperature,omitempty" validate:"omitempty,gte=0,lte=2"`
@@ -40,12 +41,14 @@ type ChatSessionParameters struct {
 /*
 getDefaultChatSessionParams generate default chat session request params
 
+	@param model string - chat session model
 	@return default chat session parameters
 */
-func getDefaultChatSessionParams() ChatSessionParameters {
+func getDefaultChatSessionParams(model string) ChatSessionParameters {
 	defaultTemp := DefaultChatRequestTemperature
 	defaultTopP := DefaultChatRequestTopP
 	return ChatSessionParameters{
+		Model:       model,
 		MaxTokens:   DefaultChatMaxResponseTokens,
 		Temperature: &defaultTemp,
 		TopP:        &defaultTopP,
@@ -60,6 +63,7 @@ Only fields in the new setting which are not nil will be merged in
 	@param newSetting ChatSessionParameters - new setting
 */
 func (s *ChatSessionParameters) MergeWithNewSettings(newSetting ChatSessionParameters) {
+	s.Model = newSetting.Model
 	if newSetting.Suffix != nil {
 		s.Suffix = newSetting.Suffix
 	}
@@ -87,10 +91,10 @@ ChatExchange defines one exchange during a chat session.
 An exchange is defined as a request and its associated response
 */
 type ChatExchange struct {
-	RequestTimestamp  time.Time `validate:"required"`
-	Request           string    `validate:"required"`
-	ResponseTimestamp time.Time `validate:"required"`
-	Response          string    `validate:"required"`
+	RequestTimestamp  time.Time `yaml:"request_ts" json:"request_ts" validate:"required"`
+	Request           string    `yaml:"request" json:"request" validate:"required"`
+	ResponseTimestamp time.Time `yaml:"response_ts" json:"response_ts" validate:"required"`
+	Response          string    `yaml:"response" json:"response" validate:"required"`
 }
 
 /*
@@ -129,22 +133,6 @@ type ChatSession interface {
 			@return the associated User
 	*/
 	User(ctxt context.Context) (User, error)
-
-	/*
-		CurrentModel query for currently selected text model
-
-			@param ctxt context.Context - query context
-			@return the current model name
-	*/
-	CurrentModel(ctxt context.Context) (string, error)
-
-	/*
-		ChangeModel change to model for the session
-
-			@param ctxt context.Context - query context
-			@param newModel string - the name of the new model
-	*/
-	ChangeModel(ctxt context.Context, newModel string) error
 
 	/*
 		Settings returns the current session wide API request parameters

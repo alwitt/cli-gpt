@@ -120,7 +120,7 @@ func actionListUsers(args *commonCLIArgs) cli.ActionFunc {
 		if len(userEntries) > 0 {
 			// Print the user entries
 			type userDisplay struct {
-				UserID   string `yaml:"user-id"`
+				UserID   string `yaml:"id"`
 				Username string `yaml:"username"`
 			}
 			displayEntries := []userDisplay{}
@@ -128,31 +128,31 @@ func actionListUsers(args *commonCLIArgs) cli.ActionFunc {
 				userID, err := oneUser.GetID(app.ctxt)
 				if err != nil {
 					log.WithError(err).WithFields(logtags).Error("Failed to read user ID")
-					return nil
+					return err
 				}
 				username, err := oneUser.GetName(app.ctxt)
 				if err != nil {
 					log.WithError(err).WithFields(logtags).Error("Failed to read username")
-					return nil
+					return err
 				}
 				displayEntries = append(displayEntries, userDisplay{UserID: userID, Username: username})
 			}
 
 			type toDisplay struct {
 				ActiveUser userDisplay   `yaml:"active"`
-				AllUsers   []userDisplay `yaml:"all-users"`
+				AllUsers   []userDisplay `yaml:"users"`
 			}
 			display := toDisplay{AllUsers: displayEntries}
 			if app.currentUser != nil {
 				userID, err := app.currentUser.GetID(app.ctxt)
 				if err != nil {
 					log.WithError(err).WithFields(logtags).Error("Failed to read active user ID")
-					return nil
+					return err
 				}
 				username, err := app.currentUser.GetName(app.ctxt)
 				if err != nil {
 					log.WithError(err).WithFields(logtags).Error("Failed to read active username")
-					return nil
+					return err
 				}
 				display.ActiveUser = userDisplay{UserID: userID, Username: username}
 			}

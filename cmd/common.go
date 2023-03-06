@@ -391,8 +391,8 @@ func GenerateCreateSubcommands() []*cli.Command {
 			Aliases:     []string{"chats"},
 			Usage:       "Start new chat session",
 			Description: "Start new chat session for currently active user",
-			Flags:       CommonParams.GetCommonCLIFlags(),
-			Action:      actionStartNewChat(&CommonParams),
+			Flags:       startNewChatParams.getCLIFlags(),
+			Action:      actionStartNewChat(&startNewChatParams),
 		},
 	}
 }
