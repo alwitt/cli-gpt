@@ -177,12 +177,19 @@ func actionListChatSession(args *commonCLIArgs) cli.ActionFunc {
 			log.WithError(err).WithFields(logtags).Error("Unable to list user's chat sessions")
 		}
 
+		activeSession, err := app.currentUser.GetActiveSessionID(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Unable to query user's active session")
+			return err
+		}
+
 		if len(sessions) > 0 {
 			type chatDisplay struct {
-				SessionID    string `yaml:"id"`
-				SessionState string `yaml:"state"`
-				Model        string `yaml:"model"`
-				FirstRequest string `yaml:"request"`
+				SessionID       string `yaml:"id"`
+				CurrentlyActive bool   `yaml:"in-focus"`
+				SessionState    string `yaml:"state"`
+				Model           string `yaml:"model"`
+				FirstRequest    string `yaml:"request"`
 			}
 			displayEntries := []chatDisplay{}
 
@@ -207,6 +214,11 @@ func actionListChatSession(args *commonCLIArgs) cli.ActionFunc {
 					SessionID:    sessionID,
 					SessionState: string(sessionState),
 					Model:        setting.Model,
+				}
+				if activeSession != nil {
+					if sessionID == *activeSession {
+						displayEntry.CurrentlyActive = true
+					}
 				}
 				displayEntries = append(displayEntries, displayEntry)
 			}
@@ -293,6 +305,12 @@ func actionGetChatSessionDetails(args *standardChatActionCLIArgs) cli.ActionFunc
 			return err
 		}
 
+		activeSession, err := app.currentUser.GetActiveSessionID(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Unable to query user's active session")
+			return err
+		}
+
 		session, err := chatManager.GetSession(app.ctxt, args.SessionID)
 		if err != nil {
 			log.
@@ -304,12 +322,18 @@ func actionGetChatSessionDetails(args *standardChatActionCLIArgs) cli.ActionFunc
 
 		// Create the display
 		type sessionDisplay struct {
-			SessionID    string                            `yaml:"id"`
-			SessionState string                            `yaml:"state"`
-			Settings     persistence.ChatSessionParameters `yaml:"settings"`
-			Exchanges    []persistence.ChatExchange        `yaml:"exchanges"`
+			SessionID       string                            `yaml:"id"`
+			CurrentlyActive bool                              `yaml:"in-focus"`
+			SessionState    string                            `yaml:"state"`
+			Settings        persistence.ChatSessionParameters `yaml:"settings"`
+			Exchanges       []persistence.ChatExchange        `yaml:"exchanges"`
 		}
 		display := sessionDisplay{SessionID: args.SessionID}
+		if activeSession != nil {
+			if args.SessionID == *activeSession {
+				display.CurrentlyActive = true
+			}
+		}
 
 		state, err := session.SessionState(app.ctxt)
 		if err != nil {
