@@ -3,6 +3,7 @@ package openai
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -141,6 +142,8 @@ func (s *chatSessionHandlerImpl) SendRequest(ctxt context.Context, prompt string
 	}()
 	requestTimestamp := time.Now()
 
+	rg := regexp.MustCompile(`(\r\n?|\n){2,}`)
+
 	// Process the received response segments
 	respBuilder := strings.Builder{}
 	complete := false
@@ -148,8 +151,10 @@ func (s *chatSessionHandlerImpl) SendRequest(ctxt context.Context, prompt string
 		select {
 		case msg, ok := <-clientResp:
 			if ok {
+				// Clean newline
+				cleaned := rg.ReplaceAllString(msg, "$1")
 				// New response segment
-				respBuilder.WriteString(msg)
+				respBuilder.WriteString(cleaned)
 				// Pass up to caller
 				resp <- msg
 			} else {
