@@ -39,6 +39,12 @@ func main() {
 				Subcommands: cmd.GenerateDescribeSubcommands(),
 			},
 			{
+				Name:        "update",
+				Usage:       "Update resource",
+				Description: "Update recorded resources",
+				Subcommands: cmd.GenerateUpdateSubcommands(),
+			},
+			{
 				Name:        "delete",
 				Usage:       "Delete resources",
 				Description: "Delete resources",

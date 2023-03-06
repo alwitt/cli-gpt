@@ -365,7 +365,7 @@ func (c *sqlChatPersistance) NewSession(ctxt context.Context, model string) (Cha
 			State:          ChatSessionStateOpen,
 			UserID:         userID,
 			Model:          model,
-			CommonSettings: ChatSessionParameters{MaxTokens: DefaultChatMaxResponseTokens},
+			CommonSettings: getDefaultChatSessionParams(),
 		}
 		if tmp := tx.Create(&newEntry); tmp.Error != nil {
 			log.

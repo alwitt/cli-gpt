@@ -398,6 +398,24 @@ func GenerateCreateSubcommands() []*cli.Command {
 }
 
 /*
+GenerateUpdateSubcommands generate list of subcommands for "update"
+
+	@return the list of CLI subcommands
+*/
+func GenerateUpdateSubcommands() []*cli.Command {
+	return []*cli.Command{
+		{
+			Name:        "chat",
+			Aliases:     []string{"chats"},
+			Usage:       "Update chat session request settings",
+			Description: "Update chat session request settings",
+			Flags:       updateChatSettingParams.getCLIFlags(),
+			Action:      actionUpdateChatSessionSettings(&updateChatSettingParams),
+		},
+	}
+}
+
+/*
 GenerateDeleteSubcommands generate list of subcommands for "delete"
 
 	@return the list of CLI subcommands

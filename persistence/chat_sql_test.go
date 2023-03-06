@@ -204,6 +204,34 @@ func TestSQLUserActiveSessionSet(t *testing.T) {
 	}
 }
 
+func TestChatSessionParams(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	testParam := getDefaultChatSessionParams()
+	{
+		assert.Equal(DefaultChatMaxResponseTokens, testParam.MaxTokens)
+		assert.Nil(testParam.Suffix)
+		assert.Equal(DefaultChatRequestTemperature, *testParam.Temperature)
+		assert.Equal(DefaultChatRequestTopP, *testParam.TopP)
+		assert.Nil(testParam.Stop)
+		assert.Nil(testParam.PresencePenalty)
+		assert.Nil(testParam.FrequencyPenalty)
+	}
+
+	testSuffix := uuid.NewString()
+	newParam := ChatSessionParameters{
+		Suffix:    &testSuffix,
+		MaxTokens: 4099,
+	}
+	testParam.MergeWithNewSettings(newParam)
+	{
+		assert.Equal(4099, testParam.MaxTokens)
+		assert.NotNil(testParam.Suffix)
+		assert.Equal(testSuffix, *testParam.Suffix)
+	}
+}
+
 func TestSQLChatSession(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
@@ -273,8 +301,8 @@ func TestSQLChatSession(t *testing.T) {
 		assert.Nil(err)
 		assert.Equal(DefaultChatMaxResponseTokens, settings.MaxTokens)
 		assert.Nil(settings.Suffix)
-		assert.Nil(settings.Temperature)
-		assert.Nil(settings.TopP)
+		assert.Equal(DefaultChatRequestTemperature, *settings.Temperature)
+		assert.Equal(DefaultChatRequestTopP, *settings.TopP)
 		assert.Nil(settings.Stop)
 		assert.Nil(settings.PresencePenalty)
 		assert.Nil(settings.FrequencyPenalty)

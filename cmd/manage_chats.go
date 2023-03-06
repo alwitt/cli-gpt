@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/alwitt/cli-gpt/persistence"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v3"
 )
 
 // ================================================================================
@@ -86,6 +89,128 @@ actionGetChatSessionDetails print details regarding the chat sessions
 func actionGetChatSessionDetails(args *standardChatActionCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// TODO
+		return nil
+	}
+}
+
+// ================================================================================
+
+// updateChatSettingActionCLIArgs cli arguments to update the chat session setting
+type updateChatSettingActionCLIArgs struct {
+	commonCLIArgs
+	// SessionID the chat session ID
+	SessionID string `validate:"required"`
+	// NewSettingFile new chat session setting file
+	NewSettingFile string `validate:"required,file"`
+}
+
+/*
+getCLIFlags fetch the list of CLI arguments
+
+	@return the list of CLI arguments
+*/
+func (c *updateChatSettingActionCLIArgs) getCLIFlags() []cli.Flag {
+	// Get the common CLI flags
+	cliFlags := c.GetCommonCLIFlags()
+
+	// Attach CLI arguments needed for this action
+	cliFlags = append(cliFlags, []cli.Flag{
+		&cli.StringFlag{
+			Name:        "session-id",
+			Usage:       "Target chat session ID",
+			Aliases:     []string{"i"},
+			EnvVars:     []string{"TARGET_SESSION_ID"},
+			Destination: &c.SessionID,
+			Required:    true,
+		},
+		&cli.StringFlag{
+			Name:        "settings-file",
+			Usage:       "YAML file containing new chat session settings",
+			Aliases:     []string{"f"},
+			EnvVars:     []string{"CHAT_SESSION_SETTINGS_FILE"},
+			Destination: &c.NewSettingFile,
+			Required:    true,
+		},
+	}...)
+
+	return cliFlags
+}
+
+var updateChatSettingParams updateChatSettingActionCLIArgs
+
+/*
+actionUpdateChatSessionSettings update the chat session settings
+
+	@param args *updateChatSettingActionCLIArgs - CLI arguments
+	@return the CLI action
+*/
+func actionUpdateChatSessionSettings(args *updateChatSettingActionCLIArgs) cli.ActionFunc {
+	return func(ctx *cli.Context) error {
+		// Initialize application
+		app, err := args.initialSetup(validator.New(), "list-user")
+		if err != nil {
+			log.WithError(err).Error("Failed to prepare new application")
+			return err
+		}
+
+		logtags := app.GetLogTagsForContext(app.ctxt)
+
+		if app.currentUser == nil {
+			return fmt.Errorf("no active user selected")
+		}
+
+		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
+			return err
+		}
+
+		session, err := chatManager.GetSession(app.ctxt, args.SessionID)
+		if err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Could not fetch chat session '%s'", args.SessionID)
+			return err
+		}
+
+		// Get current settings
+		currentSetting, err := session.Settings(app.ctxt)
+		if err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Unable to read chat session '%s' settings", args.SessionID)
+			return err
+		}
+
+		// Parse the new chat setting config
+		settingContent, err := os.ReadFile(args.NewSettingFile)
+		if err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Unable to read setting file '%s'", args.NewSettingFile)
+			return err
+		}
+		var newSetting persistence.ChatSessionParameters
+		if err := yaml.Unmarshal(settingContent, &newSetting); err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Unable to parse setting file '%s'", args.NewSettingFile)
+			return err
+		}
+
+		// Merge the new setting into the existing setting
+		currentSetting.MergeWithNewSettings(newSetting)
+
+		// Store the updated setting
+		if err := session.ChangeSettings(app.ctxt, currentSetting); err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to apply new session setting")
+			return err
+		}
+
 		return nil
 	}
 }

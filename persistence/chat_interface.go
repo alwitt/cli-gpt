@@ -11,6 +11,10 @@ type ChatSessionState string
 const (
 	// DefaultChatMaxResponseTokens default max token count for chat session response
 	DefaultChatMaxResponseTokens = 2048
+	// DefaultChatRequestTemperature default chat request temperature
+	DefaultChatRequestTemperature = float32(1.0)
+	// DefaultChatRequestTopP default chat request TopP
+	DefaultChatRequestTopP = float32(0)
 
 	// ChatSessionStateOpen ENUM for chat session state "OPEN"
 	ChatSessionStateOpen ChatSessionState = "session-open"
@@ -24,13 +28,57 @@ ChatSessionParameters common API request parameters used for one chat session
 See https://platform.openai.com/docs/api-reference/completions/create for explanations
 */
 type ChatSessionParameters struct {
-	Suffix           *string  `json:"suffix,omitempty"`
-	MaxTokens        int      `json:"max_tokens"`
-	Temperature      *float32 `json:"temperature,omitempty" validate:"omitempty,gte=0,lte=2"`
-	TopP             *float32 `json:"top_p,omitempty" validate:"omitempty,gte=0,lte=1"`
-	Stop             []string `json:"stop,omitempty" validate:"omitempty,lte=4"`
-	PresencePenalty  *float32 `json:"presence_penalty,omitempty" validate:"omitempty,gte=-2,lte=2"`
-	FrequencyPenalty *float32 `json:"frequency_penalty,omitempty" validate:"omitempty,gte=-2,lte=2"`
+	Suffix           *string  `yaml:"suffix,omitempty" json:"suffix,omitempty"`
+	MaxTokens        int      `yaml:"max_tokens" json:"max_tokens" validate:"required,gte=10,lte=4096"`
+	Temperature      *float32 `yaml:"temperature,omitempty" json:"temperature,omitempty" validate:"omitempty,gte=0,lte=2"`
+	TopP             *float32 `yaml:"top_p,omitempty" json:"top_p,omitempty" validate:"omitempty,gte=0,lte=1"`
+	Stop             []string `yaml:"stop,omitempty" json:"stop,omitempty" validate:"omitempty,lte=4"`
+	PresencePenalty  *float32 `yaml:"presence_penalty,omitempty" json:"presence_penalty,omitempty" validate:"omitempty,gte=-2,lte=2"`
+	FrequencyPenalty *float32 `yaml:"frequency_penalty,omitempty" json:"frequency_penalty,omitempty" validate:"omitempty,gte=-2,lte=2"`
+}
+
+/*
+getDefaultChatSessionParams generate default chat session request params
+
+	@return default chat session parameters
+*/
+func getDefaultChatSessionParams() ChatSessionParameters {
+	defaultTemp := DefaultChatRequestTemperature
+	defaultTopP := DefaultChatRequestTopP
+	return ChatSessionParameters{
+		MaxTokens:   DefaultChatMaxResponseTokens,
+		Temperature: &defaultTemp,
+		TopP:        &defaultTopP,
+	}
+}
+
+/*
+MergeWithNewSettings merge the contents of the new setting into current setting
+
+Only fields in the new setting which are not nil will be merged in
+
+	@param newSetting ChatSessionParameters - new setting
+*/
+func (s *ChatSessionParameters) MergeWithNewSettings(newSetting ChatSessionParameters) {
+	if newSetting.Suffix != nil {
+		s.Suffix = newSetting.Suffix
+	}
+	s.MaxTokens = newSetting.MaxTokens
+	if newSetting.Temperature != nil {
+		s.Temperature = newSetting.Temperature
+	}
+	if newSetting.TopP != nil {
+		s.TopP = newSetting.TopP
+	}
+	if len(newSetting.Stop) > 0 {
+		s.Stop = newSetting.Stop
+	}
+	if newSetting.PresencePenalty != nil {
+		s.PresencePenalty = newSetting.PresencePenalty
+	}
+	if newSetting.FrequencyPenalty != nil {
+		s.FrequencyPenalty = newSetting.FrequencyPenalty
+	}
 }
 
 /*
