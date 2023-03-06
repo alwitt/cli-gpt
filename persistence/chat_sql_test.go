@@ -425,4 +425,9 @@ func TestSQLChatExchange(t *testing.T) {
 		assert.Equal(exchange2.Request, firstExchange.Request)
 		assert.Equal(exchange2.Response, firstExchange.Response)
 	}
+
+	// Case 3: delete session
+	sessionID, err := uut.SessionID(utContext)
+	assert.Nil(err)
+	assert.Nil(chatManager.DeleteSession(utContext, sessionID))
 }

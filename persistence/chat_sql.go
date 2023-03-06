@@ -497,6 +497,16 @@ func (c *sqlChatPersistance) DeleteSession(ctxt context.Context, sessionID strin
 		}
 
 		if tmp := tx.
+			Where(&sqlChatExchangeEntry{SessionID: sessionID}).
+			Delete(&sqlChatExchangeEntry{}); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Unable to delete chat exchanges of session '%s'", sessionID)
+			return tmp.Error
+		}
+
+		if tmp := tx.
 			Where(&sqlChatSessionEntry{UserID: userID, ID: sessionID}).
 			Delete(&sqlChatSessionEntry{}); tmp.Error != nil {
 			log.
