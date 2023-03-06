@@ -83,11 +83,11 @@ type commonCLIArgs struct {
 }
 
 /*
-getCommonCLIFlags fetch the list of CLI arguments
+GetCommonCLIFlags fetch the list of CLI arguments
 
 	@return the list of CLI arguments
 */
-func (c *commonCLIArgs) getCommonCLIFlags() []cli.Flag {
+func (c *commonCLIArgs) GetCommonCLIFlags() []cli.Flag {
 	usr, err := user.Current()
 	if err != nil {
 		log.WithError(err).Fatal("Unable to query user of calling user")
@@ -142,7 +142,8 @@ func (c *commonCLIArgs) getCommonCLIFlags() []cli.Flag {
 	}
 }
 
-var commonParams commonCLIArgs
+// CommonParams basic CLI arguments
+var CommonParams commonCLIArgs
 
 /*
 initialSetup perform basic application setup
@@ -338,8 +339,34 @@ func GenerateGetSubcommands() []*cli.Command {
 			Aliases:     []string{"user"},
 			Usage:       "List registered users",
 			Description: "List registered users",
-			Flags:       commonParams.getCommonCLIFlags(),
-			Action:      actionListUsers(&commonParams),
+			Flags:       CommonParams.GetCommonCLIFlags(),
+			Action:      actionListUsers(&CommonParams),
+		},
+		{
+			Name:        "chats",
+			Aliases:     []string{"chat"},
+			Usage:       "List chat sessions",
+			Description: "List chat sessions associated with the currently active user",
+			Flags:       CommonParams.GetCommonCLIFlags(),
+			Action:      actionListChatSession(&CommonParams),
+		},
+	}
+}
+
+/*
+GenerateDescribeSubcommands generate list of subcommands for "describe"
+
+	@return the list of CLI subcommands
+*/
+func GenerateDescribeSubcommands() []*cli.Command {
+	return []*cli.Command{
+		{
+			Name:        "chats",
+			Aliases:     []string{"chat"},
+			Usage:       "Print details of a chat session",
+			Description: "Print details of a chat session",
+			Flags:       standardChatActionParams.getCLIFlags(),
+			Action:      actionGetChatSessionDetails(&standardChatActionParams),
 		},
 	}
 }
@@ -359,6 +386,14 @@ func GenerateCreateSubcommands() []*cli.Command {
 			Flags:       createUserParams.getCLIFlags(),
 			Action:      actionCreateUser(&createUserParams),
 		},
+		{
+			Name:        "chat",
+			Aliases:     []string{"chats"},
+			Usage:       "Start new chat session",
+			Description: "Start new chat session for currently active user",
+			Flags:       CommonParams.GetCommonCLIFlags(),
+			Action:      actionStartNewChat(&CommonParams),
+		},
 	}
 }
 
@@ -374,8 +409,16 @@ func GenerateDeleteSubcommands() []*cli.Command {
 			Aliases:     []string{"users"},
 			Usage:       "Delete currently active user",
 			Description: "Delete currently active user. This will also delete this user's data.",
-			Flags:       commonParams.getCommonCLIFlags(),
-			Action:      actionDeleteActiveUser(&commonParams),
+			Flags:       CommonParams.GetCommonCLIFlags(),
+			Action:      actionDeleteActiveUser(&CommonParams),
+		},
+		{
+			Name:        "chat",
+			Aliases:     []string{"chats"},
+			Usage:       "Delete chat session",
+			Description: "Delete chat session",
+			Flags:       standardChatActionParams.getCLIFlags(),
+			Action:      actionDeleteChatSession(&standardChatActionParams),
 		},
 	}
 }
@@ -388,11 +431,25 @@ GenerateContextSubcommands generate list of subcommands for "delete"
 func GenerateContextSubcommands() []*cli.Command {
 	return []*cli.Command{
 		{
-			Name:        "set-active",
+			Name:        "change-user",
 			Usage:       "Change active user",
 			Description: "Change the currently active user",
 			Flags:       changeActiveUserParams.getCLIFlags(),
 			Action:      actionChangeActiveUser(&changeActiveUserParams),
+		},
+		{
+			Name:        "select-chat",
+			Usage:       "Change active chat session",
+			Description: "Change active chat session for current user",
+			Flags:       standardChatActionParams.getCLIFlags(),
+			Action:      actionChangeActiveChatSession(&standardChatActionParams),
+		},
+		{
+			Name:        "close-chat",
+			Usage:       "Close chat session",
+			Description: "Close chat session. User can not append to session after closing",
+			Flags:       standardChatActionParams.getCLIFlags(),
+			Action:      actionCloseChatSession(&standardChatActionParams),
 		},
 	}
 }

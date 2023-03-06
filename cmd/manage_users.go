@@ -27,7 +27,7 @@ getCLIFlags fetch the list of CLI arguments
 */
 func (c *createUserCLIArgs) getCLIFlags() []cli.Flag {
 	// Get the common CLI flags
-	cliFlags := c.getCommonCLIFlags()
+	cliFlags := c.GetCommonCLIFlags()
 
 	// Attach CLI arguments needed for this action
 	cliFlags = append(cliFlags, []cli.Flag{
@@ -183,7 +183,7 @@ getCLIFlags fetch the list of CLI arguments
 */
 func (c *changeActiveUserCLIArgs) getCLIFlags() []cli.Flag {
 	// Get the common CLI flags
-	cliFlags := c.getCommonCLIFlags()
+	cliFlags := c.GetCommonCLIFlags()
 
 	// Attach CLI arguments needed for this action
 	cliFlags = append(cliFlags, []cli.Flag{

@@ -53,6 +53,13 @@ type User interface {
 	SetActiveSessionID(ctxt context.Context, sessionID string) error
 
 	/*
+	   ClearActiveSessionID clear user's active session ID
+
+	   	@param ctxt context.Context - query context
+	*/
+	ClearActiveSessionID(ctxt context.Context) error
+
+	/*
 		GetAPIToken get user API token
 
 			@param ctxt context.Context - query context
@@ -67,6 +74,13 @@ type User interface {
 			@param newToken string - new API token
 	*/
 	SetAPIToken(ctxt context.Context, newToken string) error
+
+	/*
+		Refresh helper function to sync the handler with what is stored in persistence
+
+			@param ctxt context.Context - query context
+	*/
+	Refresh(ctxt context.Context) error
 
 	/*
 		ChatSessionManager fetch chat session manager for a user

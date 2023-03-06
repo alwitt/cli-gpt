@@ -17,7 +17,7 @@ type sqlUserEntry struct {
 	Name            string                `gorm:"not null;uniqueIndex:username_index"`
 	APIToken        string                `gorm:"not null"`
 	ActiveSessionID *string               `gorm:"default:null"`
-	ActiveSession   *sqlChatSessionEntry  `gorm:"foreignKey:ActiveSessionID"`
+	ActiveSession   *sqlChatSessionEntry  `gorm:"constraint:OnDelete:SET NULL;foreignKey:ActiveSessionID"`
 	ChatSessions    []sqlChatSessionEntry `gorm:"foreignKey:UserID"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -115,6 +115,28 @@ func (h *sqlUserHandle) SetActiveSessionID(ctxt context.Context, sessionID strin
 }
 
 /*
+ClearActiveSessionID clear user's active session ID
+
+	@param ctxt context.Context - query context
+*/
+func (h *sqlUserHandle) ClearActiveSessionID(ctxt context.Context) error {
+	logtags := h.GetLogTagsForContext(ctxt)
+	return h.driver.db.Transaction(func(tx *gorm.DB) error {
+		if tmp := tx.
+			Model(&h.sqlUserEntry).
+			Update("active_session_id", nil).
+			First(&h.sqlUserEntry); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Failed to clear user '%s' active session", h.ID)
+			return tmp.Error
+		}
+		return nil
+	})
+}
+
+/*
 GetAPIToken get user API token
 
 	@param ctxt context.Context - query context
@@ -122,6 +144,27 @@ GetAPIToken get user API token
 */
 func (h *sqlUserHandle) GetAPIToken(ctxt context.Context) (string, error) {
 	return h.APIToken, nil
+}
+
+/*
+Refresh helper function to sync the handler with what is stored in persistence
+
+	@param ctxt context.Context - query context
+*/
+func (h *sqlUserHandle) Refresh(ctxt context.Context) error {
+	logtags := h.GetLogTagsForContext(ctxt)
+	return h.driver.db.Transaction(func(tx *gorm.DB) error {
+		if tmp := tx.
+			Where(&sqlUserEntry{ID: h.ID}).
+			First(&h.sqlUserEntry); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Failed to refresh user '%s' info", h.ID)
+			return tmp.Error
+		}
+		return nil
+	})
 }
 
 /*

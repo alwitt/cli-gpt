@@ -21,16 +21,22 @@ func main() {
 		// Components
 		Commands: []*cli.Command{
 			{
+				Name:        "create",
+				Usage:       "Create resources",
+				Description: "Create new resources",
+				Subcommands: cmd.GenerateCreateSubcommands(),
+			},
+			{
 				Name:        "get",
 				Usage:       "Read resources",
 				Description: "Fetch recorded resources",
 				Subcommands: cmd.GenerateGetSubcommands(),
 			},
 			{
-				Name:        "create",
-				Usage:       "Create resources",
-				Description: "Create new resources",
-				Subcommands: cmd.GenerateCreateSubcommands(),
+				Name:        "describe",
+				Usage:       "Describe resource",
+				Description: "Provide details regarding a resource",
+				Subcommands: cmd.GenerateDescribeSubcommands(),
 			},
 			{
 				Name:        "delete",
@@ -43,6 +49,14 @@ func main() {
 				Usage:       "User context settings",
 				Description: "User context settings",
 				Subcommands: cmd.GenerateContextSubcommands(),
+			},
+			// Usage specific commands
+			{
+				Name:        "chat",
+				Usage:       "Append to currently active chat session",
+				Description: "Append new exchange to currently active chat session of selected user",
+				Flags:       cmd.CommonParams.GetCommonCLIFlags(),
+				Action:      cmd.ActionAppendToChatSession(&cmd.CommonParams),
 			},
 		},
 	}

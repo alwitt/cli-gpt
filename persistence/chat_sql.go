@@ -299,6 +299,27 @@ func (h *sqlChatSessionHandle) Exchanges(ctxt context.Context) ([]ChatExchange, 
 	})
 }
 
+/*
+Refresh helper function to sync the handler with what is stored in persistence
+
+	@param ctxt context.Context - query context
+*/
+func (h *sqlChatSessionHandle) Refresh(ctxt context.Context) error {
+	logtags := h.GetLogTagsForContext(ctxt)
+	return h.driver.db.Transaction(func(tx *gorm.DB) error {
+		if tmp := tx.
+			Where(&sqlChatSessionEntry{ID: h.ID}).
+			First(&h.sqlChatSessionEntry); tmp.Error != nil {
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Failed to refresh chat session '%s' info", h.ID)
+			return tmp.Error
+		}
+		return nil
+	})
+}
+
 // ============================================================================================
 // SQL Chat Session Manager implementation
 
@@ -503,7 +524,7 @@ DeleteSession delete a session
 */
 func (c *sqlChatPersistance) DeleteSession(ctxt context.Context, sessionID string) error {
 	logtags := c.GetLogTagsForContext(ctxt)
-	return c.db.Transaction(func(tx *gorm.DB) error {
+	if err := c.db.Transaction(func(tx *gorm.DB) error {
 		userID, err := c.user.GetID(ctxt)
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Unable to get associated user ID")
@@ -520,5 +541,13 @@ func (c *sqlChatPersistance) DeleteSession(ctxt context.Context, sessionID strin
 			return tmp.Error
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	// In case the deleted session was the current active session for the user
+	if err := c.user.Refresh(ctxt); err != nil {
+		log.WithError(err).WithFields(logtags).Error("Failed to refresh user entry after session delete")
+		return err
+	}
+	return nil
 }

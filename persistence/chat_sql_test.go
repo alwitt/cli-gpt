@@ -171,12 +171,36 @@ func TestSQLUserActiveSessionSet(t *testing.T) {
 
 	// Case 4: link session through session manager
 	assert.Nil(chatManager.SetActiveSession(utContext, session1))
+	sessionID1, err := session1.SessionID(utContext)
+	assert.Nil(err)
 	{
-		sessionID1, err := session1.SessionID(utContext)
-		assert.Nil(err)
 		activeSession, err := user0.GetActiveSessionID(utContext)
 		assert.Nil(err)
 		assert.Equal(sessionID1, *activeSession)
+	}
+
+	// Case 5: clear the active session
+	assert.Nil(user0.ClearActiveSessionID(utContext))
+	{
+		activeSession, err := user0.GetActiveSessionID(utContext)
+		assert.Nil(err)
+		assert.Nil(activeSession)
+	}
+
+	// Attach session again
+	assert.Nil(chatManager.SetActiveSession(utContext, session1))
+	{
+		activeSession, err := user0.GetActiveSessionID(utContext)
+		assert.Nil(err)
+		assert.Equal(sessionID1, *activeSession)
+	}
+
+	// Case 6: clear the active session by deleting it
+	assert.Nil(chatManager.DeleteSession(utContext, sessionID1))
+	{
+		activeSession, err := user0.GetActiveSessionID(utContext)
+		assert.Nil(err)
+		assert.Nil(activeSession)
 	}
 }
 

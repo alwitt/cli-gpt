@@ -141,6 +141,13 @@ type ChatSession interface {
 			@return list of exchanges in chronological order
 	*/
 	Exchanges(ctxt context.Context) ([]ChatExchange, error)
+
+	/*
+		Refresh helper function to sync the handler with what is stored in persistence
+
+			@param ctxt context.Context - query context
+	*/
+	Refresh(ctxt context.Context) error
 }
 
 /*
