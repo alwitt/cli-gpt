@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/alwitt/goutils"
@@ -436,8 +437,9 @@ func (c *sqlChatPersistance) CurrentActiveSession(ctxt context.Context) (ChatSes
 
 		if activeSessionID == nil {
 			// The user has no active sessions
-			log.WithFields(logtags).Debug("User has no active sessions")
-			return nil
+			err := fmt.Errorf("user has not set an active session")
+			log.WithError(err).WithFields(logtags).Debug("Failed to read active session ID")
+			return err
 		}
 
 		userID, err := c.user.GetID(ctxt)

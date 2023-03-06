@@ -1,10 +1,15 @@
 package cmd
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+	"sync"
 
+	"github.com/alwitt/cli-gpt/openai"
 	"github.com/alwitt/cli-gpt/persistence"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
@@ -12,6 +17,25 @@ import (
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 )
+
+// multilinePrompt prompt the user to input multi-line input
+func multilinePrompt(ctxt context.Context) (string, error) {
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Split(bufio.ScanLines)
+
+	print("> ")
+	// Start reading
+	inputBuilder := strings.Builder{}
+	for scanner.Scan() {
+		oneLine := scanner.Text()
+		if len(oneLine) == 0 {
+			break
+		}
+		inputBuilder.WriteString(fmt.Sprintf("%s\n", oneLine))
+	}
+
+	return inputBuilder.String(), nil
+}
 
 // ================================================================================
 
@@ -231,8 +255,64 @@ func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 		}
 
 		// Make the first exchange
+		prompt, err := multilinePrompt(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to prompt for user request")
+			return err
+		}
 
-		return nil
+		log.WithFields(logtags).Debugf("Your prompt:\n%s\n", prompt)
+
+		client, err := openai.GetClient(app.ctxt, app.currentUser)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
+			return err
+		}
+
+		promptBuilder, err := openai.GetSimpleChatPromptBuilder()
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to define basic prompt builder")
+			return err
+		}
+
+		chatHandler, err := openai.DefineChatSessionHandler(app.ctxt, session, client, promptBuilder)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to define chat handler")
+			return err
+		}
+
+		log.WithFields(logtags).Debug("Defined chat handler")
+
+		respChan := make(chan string)
+
+		var reqErr error
+
+		wg := sync.WaitGroup{}
+		defer wg.Wait()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if reqErr = chatHandler.SendRequest(app.ctxt, prompt, respChan); reqErr != nil {
+				log.WithError(reqErr).WithFields(logtags).Error("Request-response failed")
+			}
+		}()
+
+		terminate := false
+		for !terminate {
+			select {
+			case <-app.ctxt.Done():
+				terminate = true
+			case msg, ok := <-respChan:
+				if ok {
+					print(msg)
+					terminate = false
+				} else {
+					terminate = true
+				}
+			}
+		}
+
+		return reqErr
 	}
 }
 
@@ -312,6 +392,9 @@ func actionListChatSession(args *commonCLIArgs) cli.ActionFunc {
 					if sessionID == *activeSession {
 						displayEntry.CurrentlyActive = true
 					}
+				}
+				if firstExchange, err := oneSession.FirstExchange(app.ctxt); err == nil {
+					displayEntry.FirstRequest = firstExchange.Request
 				}
 				displayEntries = append(displayEntries, displayEntry)
 			}
@@ -710,7 +793,91 @@ ActionAppendToChatSession append new exchange to active chat session
 */
 func ActionAppendToChatSession(args *commonCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
-		// TODO
-		return nil
+		// Initialize application
+		app, err := args.initialSetup(validator.New(), "list-user")
+		if err != nil {
+			log.WithError(err).Error("Failed to prepare new application")
+			return err
+		}
+
+		logtags := app.GetLogTagsForContext(app.ctxt)
+
+		if app.currentUser == nil {
+			return fmt.Errorf("no active user selected")
+		}
+
+		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
+			return err
+		}
+
+		session, err := chatManager.CurrentActiveSession(app.ctxt)
+		if err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Error("Could not fetch active chat session")
+			return err
+		}
+
+		prompt, err := multilinePrompt(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to prompt for user request")
+			return err
+		}
+
+		log.WithFields(logtags).Debugf("Your prompt:\n%s\n", prompt)
+
+		client, err := openai.GetClient(app.ctxt, app.currentUser)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
+			return err
+		}
+
+		promptBuilder, err := openai.GetSimpleChatPromptBuilder()
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to define basic prompt builder")
+			return err
+		}
+
+		chatHandler, err := openai.DefineChatSessionHandler(app.ctxt, session, client, promptBuilder)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to define chat handler")
+			return err
+		}
+
+		log.WithFields(logtags).Debug("Defined chat handler")
+
+		respChan := make(chan string)
+
+		var reqErr error
+
+		wg := sync.WaitGroup{}
+		defer wg.Wait()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if reqErr = chatHandler.SendRequest(app.ctxt, prompt, respChan); reqErr != nil {
+				log.WithError(reqErr).WithFields(logtags).Error("Request-response failed")
+			}
+		}()
+
+		terminate := false
+		for !terminate {
+			select {
+			case <-app.ctxt.Done():
+				terminate = true
+			case msg, ok := <-respChan:
+				if ok {
+					print(msg)
+					terminate = false
+				} else {
+					terminate = true
+				}
+			}
+		}
+
+		return reqErr
 	}
 }

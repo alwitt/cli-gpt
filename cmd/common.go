@@ -170,10 +170,10 @@ func (c *commonCLIArgs) initialSetup(
 		sqlLogLevel = gormLogger.Warn
 		log.SetLevel(log.InfoLevel)
 	case "warn":
-		sqlLogLevel = gormLogger.Warn
+		sqlLogLevel = gormLogger.Error
 		log.SetLevel(log.WarnLevel)
 	case "error":
-		sqlLogLevel = gormLogger.Error
+		sqlLogLevel = gormLogger.Silent
 		log.SetLevel(log.ErrorLevel)
 	default:
 		sqlLogLevel = gormLogger.Silent
