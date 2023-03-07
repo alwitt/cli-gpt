@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alwitt/cli-gpt/openai"
+	"github.com/alwitt/cli-gpt/api"
 	"github.com/alwitt/cli-gpt/persistence"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
@@ -263,19 +263,19 @@ func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 
 		log.WithFields(logtags).Debugf("Your prompt:\n%s\n", prompt)
 
-		client, err := openai.GetClient(app.ctxt, app.currentUser)
+		client, err := api.GetClient(app.ctxt, app.currentUser)
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
 			return err
 		}
 
-		promptBuilder, err := openai.GetSimpleChatPromptBuilder()
+		promptBuilder, err := api.GetSimpleChatPromptBuilder()
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define basic prompt builder")
 			return err
 		}
 
-		chatHandler, err := openai.DefineChatSessionHandler(app.ctxt, session, client, promptBuilder)
+		chatHandler, err := api.DefineChatSessionHandler(app.ctxt, session, client, promptBuilder)
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define chat handler")
 			return err
@@ -829,19 +829,19 @@ func ActionAppendToChatSession(args *commonCLIArgs) cli.ActionFunc {
 
 		log.WithFields(logtags).Debugf("Your prompt:\n%s\n", prompt)
 
-		client, err := openai.GetClient(app.ctxt, app.currentUser)
+		client, err := api.GetClient(app.ctxt, app.currentUser)
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
 			return err
 		}
 
-		promptBuilder, err := openai.GetSimpleChatPromptBuilder()
+		promptBuilder, err := api.GetSimpleChatPromptBuilder()
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define basic prompt builder")
 			return err
 		}
 
-		chatHandler, err := openai.DefineChatSessionHandler(app.ctxt, session, client, promptBuilder)
+		chatHandler, err := api.DefineChatSessionHandler(app.ctxt, session, client, promptBuilder)
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define chat handler")
 			return err
