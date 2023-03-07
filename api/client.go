@@ -9,7 +9,7 @@ import (
 	"github.com/alwitt/cli-gpt/persistence"
 	"github.com/alwitt/goutils"
 	"github.com/apex/log"
-	gogpt "github.com/sashabaranov/go-gpt3"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 /*
@@ -32,7 +32,7 @@ type Client interface {
 // clientImpl implements Client
 type clientImpl struct {
 	goutils.Component
-	client *gogpt.Client
+	client *openai.Client
 }
 
 /*
@@ -60,7 +60,7 @@ func GetClient(ctxt context.Context, user persistence.User) (Client, error) {
 			LogTags:         logTags,
 			LogTagModifiers: []goutils.LogMetadataModifier{},
 		},
-		client: gogpt.NewClient(userAPI),
+		client: openai.NewClient(userAPI),
 	}, nil
 }
 
@@ -121,19 +121,19 @@ func (c *clientImpl) MakeCompletionRequest(
 	var requestedModel string
 	switch settings.Model {
 	case "davinci":
-		requestedModel = gogpt.GPT3TextDavinci003
+		requestedModel = openai.GPT3TextDavinci003
 	case "curie":
-		requestedModel = gogpt.GPT3TextCurie001
+		requestedModel = openai.GPT3TextCurie001
 	case "babbage":
-		requestedModel = gogpt.GPT3TextBabbage001
+		requestedModel = openai.GPT3TextBabbage001
 	case "ada":
-		requestedModel = gogpt.GPT3TextAda001
+		requestedModel = openai.GPT3TextAda001
 	default:
-		requestedModel = gogpt.GPT3TextDavinci003
+		requestedModel = openai.GPT3TextDavinci003
 	}
 
 	// Build the request
-	request := gogpt.CompletionRequest{
+	request := openai.CompletionRequest{
 		Model:     requestedModel,
 		MaxTokens: settings.MaxTokens,
 		Prompt:    prompt,
