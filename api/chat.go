@@ -37,9 +37,8 @@ type ChatSessionHandler interface {
 // chatSessionHandlerImpl implements ChatSessionHandler
 type chatSessionHandlerImpl struct {
 	goutils.Component
-	session       persistence.ChatSession
-	client        Client
-	promptBuilder ChatPromptBuilder
+	session persistence.ChatSession
+	client  Client
 }
 
 /*
@@ -48,14 +47,12 @@ DefineChatSessionHandler create chat session tracker
 	@param ctxt context.Context - query context
 	@param session persistence.ChatSession - chat session parameters
 	@param client GPTClient - OpenAI GPT model API client
-	@param promptBuilder PromptBuilder - prompt builder to use
 	@return new chat session tracker
 */
 func DefineChatSessionHandler(
 	ctxt context.Context,
 	session persistence.ChatSession,
 	client Client,
-	promptBuilder ChatPromptBuilder,
 ) (ChatSessionHandler, error) {
 	user, err := session.User(ctxt)
 	if err != nil {
@@ -80,7 +77,9 @@ func DefineChatSessionHandler(
 		Component: goutils.Component{
 			LogTags:         logTags,
 			LogTagModifiers: []goutils.LogMetadataModifier{},
-		}, session: session, client: client, promptBuilder: promptBuilder,
+		},
+		session: session,
+		client:  client,
 	}, nil
 }
 
@@ -91,7 +90,9 @@ SendRequest send a new request within the session
 	@param prompt string - the prompt to send
 	@param resp chan string - channel for sending out the responses from the model
 */
-func (s *chatSessionHandlerImpl) SendRequest(ctxt context.Context, prompt string, resp chan string) error {
+func (s *chatSessionHandlerImpl) SendRequest(
+	ctxt context.Context, prompt string, resp chan string,
+) error {
 	logtags := s.GetLogTagsForContext(ctxt)
 	defer close(resp)
 
@@ -113,13 +114,6 @@ func (s *chatSessionHandlerImpl) SendRequest(ctxt context.Context, prompt string
 	// Prepare a separate channel for receiving responses from the client
 	clientResp := make(chan string)
 
-	// Build the request prompt
-	actualPrompt, err := s.promptBuilder.CreatePrompt(ctxt, s.session, prompt)
-	if err != nil {
-		log.WithError(err).WithFields(logtags).Error("Failed to build new complete prompt")
-		return err
-	}
-
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 
@@ -134,7 +128,7 @@ func (s *chatSessionHandlerImpl) SendRequest(ctxt context.Context, prompt string
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := s.client.MakeCompletionRequest(requestCtxt, s.session, actualPrompt, clientResp)
+		err := s.client.MakeCompletionRequest(requestCtxt, s.session, prompt, clientResp)
 		if err != nil {
 			requestErr = err
 			ctxtCancel()

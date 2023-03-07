@@ -43,7 +43,7 @@ func multilinePrompt(ctxt context.Context) (string, error) {
 type startNewChatActionCLIArgs struct {
 	commonCLIArgs
 	// Model model to use
-	Model string `validate:"required,oneof=davinci curie babbage ada"`
+	Model string `validate:"required,oneof=turbo davinci curie babbage ada"`
 	// SettingFile chat session setting file
 	SettingFile string `validate:"omitempty,file"`
 }
@@ -56,11 +56,11 @@ func (c *startNewChatActionCLIArgs) getCLIFlags() []cli.Flag {
 	cliFlags = append(cliFlags, []cli.Flag{
 		&cli.StringFlag{
 			Name:        "model",
-			Usage:       "Text generation model: [davinci curie babbage ada]",
+			Usage:       "Text generation model: [turbo davinci curie babbage ada]",
 			Aliases:     []string{"m"},
 			EnvVars:     []string{"TEXT_COMPLETION_MODEL"},
-			Value:       "davinci",
-			DefaultText: "davinci",
+			Value:       "turbo",
+			DefaultText: "turbo",
 			Destination: &c.Model,
 			Required:    false,
 		},
@@ -89,7 +89,7 @@ func askUserForChatRequestOptions() (persistence.ChatSessionParameters, error) {
 	// Ask for model
 	modelPrompt := promptui.Select{
 		Label: "Select request model",
-		Items: []string{"davinci", "curie", "babbage", "ada"},
+		Items: []string{"turbo", "davinci", "curie", "babbage", "ada"},
 	}
 	if _, result.Model, err = modelPrompt.Run(); err != nil {
 		return result, err
@@ -263,19 +263,19 @@ func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 
 		log.WithFields(logtags).Debugf("Your prompt:\n%s\n", prompt)
 
-		client, err := api.GetClient(app.ctxt, app.currentUser)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
-			return err
-		}
-
 		promptBuilder, err := api.GetSimpleChatPromptBuilder()
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define basic prompt builder")
 			return err
 		}
 
-		chatHandler, err := api.DefineChatSessionHandler(app.ctxt, session, client, promptBuilder)
+		client, err := api.GetClient(app.ctxt, app.currentUser, promptBuilder)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
+			return err
+		}
+
+		chatHandler, err := api.DefineChatSessionHandler(app.ctxt, session, client)
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define chat handler")
 			return err
@@ -829,19 +829,19 @@ func ActionAppendToChatSession(args *commonCLIArgs) cli.ActionFunc {
 
 		log.WithFields(logtags).Debugf("Your prompt:\n%s\n", prompt)
 
-		client, err := api.GetClient(app.ctxt, app.currentUser)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
-			return err
-		}
-
 		promptBuilder, err := api.GetSimpleChatPromptBuilder()
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define basic prompt builder")
 			return err
 		}
 
-		chatHandler, err := api.DefineChatSessionHandler(app.ctxt, session, client, promptBuilder)
+		client, err := api.GetClient(app.ctxt, app.currentUser, promptBuilder)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
+			return err
+		}
+
+		chatHandler, err := api.DefineChatSessionHandler(app.ctxt, session, client)
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to define chat handler")
 			return err

@@ -28,7 +28,7 @@ ChatSessionParameters common API request parameters used for one chat session
 See https://platform.openai.com/docs/api-reference/completions/create for explanations
 */
 type ChatSessionParameters struct {
-	Model            string   `yaml:"model" json:"model" validate:"required,oneof=davinci curie babbage ada"`
+	Model            string   `yaml:"model" json:"model" validate:"required,oneof=turbo davinci curie babbage ada"`
 	Suffix           *string  `yaml:"suffix,omitempty" json:"suffix,omitempty"`
 	MaxTokens        int      `yaml:"max_tokens" json:"max_tokens" validate:"required,gte=10,lte=4096"`
 	Temperature      *float32 `yaml:"temperature,omitempty" json:"temperature,omitempty" validate:"omitempty,gte=0,lte=2"`

@@ -23,7 +23,6 @@ func TestChatSessionHandler(t *testing.T) {
 	mockUser := new(mocks.User)
 	mockClient := new(mocks.Client)
 	mockChatSession := new(mocks.ChatSession)
-	mockPromptBuilder := new(mocks.ChatPromptBuilder)
 
 	utContext := context.Background()
 
@@ -33,13 +32,12 @@ func TestChatSessionHandler(t *testing.T) {
 	mockChatSession.On("SessionID", utContext).Return(uuid.NewString(), nil)
 
 	// Create new chat session handler
-	uut, err := DefineChatSessionHandler(utContext, mockChatSession, mockClient, mockPromptBuilder)
+	uut, err := DefineChatSessionHandler(utContext, mockChatSession, mockClient)
 	assert.Nil(err)
 
 	// Case 0: normal flow
 	{
 		testPrompt := uuid.NewString()
-		testFullPrompt := uuid.NewString()
 		testResponse := uuid.NewString()
 		testRespChan := make(chan string)
 
@@ -48,15 +46,11 @@ func TestChatSessionHandler(t *testing.T) {
 			On("SessionState", utContext).
 			Return(persistence.ChatSessionStateOpen, nil).
 			Once()
-		mockPromptBuilder.
-			On("CreatePrompt", utContext, mockChatSession, testPrompt).
-			Return(testFullPrompt, nil).
-			Once()
 		mockClient.On(
 			"MakeCompletionRequest",
 			mock.AnythingOfType("*context.cancelCtx"),
 			mockChatSession,
-			testFullPrompt,
+			testPrompt,
 			mock.AnythingOfType("chan string"),
 		).Run(func(args mock.Arguments) {
 			respChan := args.Get(3).(chan string)
@@ -106,7 +100,7 @@ func TestChatSessionHandler(t *testing.T) {
 		assert.NotNil(uut.SendRequest(utContext, testPrompt, testRespChan))
 	}
 
-	// Case 2: prompt build failure
+	// Case 2: client ended request with error
 	{
 		testPrompt := uuid.NewString()
 		testRespChan := make(chan string)
@@ -115,35 +109,12 @@ func TestChatSessionHandler(t *testing.T) {
 		mockChatSession.
 			On("SessionState", utContext).
 			Return(persistence.ChatSessionStateOpen, nil).
-			Once()
-		mockPromptBuilder.
-			On("CreatePrompt", utContext, mockChatSession, testPrompt).
-			Return("", fmt.Errorf("dummy error")).
-			Once()
-
-		assert.NotNil(uut.SendRequest(utContext, testPrompt, testRespChan))
-	}
-
-	// Case 3: client ended request with error
-	{
-		testPrompt := uuid.NewString()
-		testFullPrompt := uuid.NewString()
-		testRespChan := make(chan string)
-
-		// Setup mocks
-		mockChatSession.
-			On("SessionState", utContext).
-			Return(persistence.ChatSessionStateOpen, nil).
-			Once()
-		mockPromptBuilder.
-			On("CreatePrompt", utContext, mockChatSession, testPrompt).
-			Return(testFullPrompt, nil).
 			Once()
 		mockClient.On(
 			"MakeCompletionRequest",
 			mock.AnythingOfType("*context.cancelCtx"),
 			mockChatSession,
-			testFullPrompt,
+			testPrompt,
 			mock.AnythingOfType("chan string"),
 		).Return(fmt.Errorf("dummy error")).Once()
 
@@ -165,10 +136,9 @@ func TestChatSessionHandler(t *testing.T) {
 		}
 	}
 
-	// Case 4: normal flow, but client returned nothing
+	// Case 3: normal flow, but client returned nothing
 	{
 		testPrompt := uuid.NewString()
-		testFullPrompt := uuid.NewString()
 		testRespChan := make(chan string)
 
 		// Setup mocks
@@ -176,15 +146,11 @@ func TestChatSessionHandler(t *testing.T) {
 			On("SessionState", utContext).
 			Return(persistence.ChatSessionStateOpen, nil).
 			Once()
-		mockPromptBuilder.
-			On("CreatePrompt", utContext, mockChatSession, testPrompt).
-			Return(testFullPrompt, nil).
-			Once()
 		mockClient.On(
 			"MakeCompletionRequest",
 			mock.AnythingOfType("*context.cancelCtx"),
 			mockChatSession,
-			testFullPrompt,
+			testPrompt,
 			mock.AnythingOfType("chan string"),
 		).Run(func(args mock.Arguments) {
 			respChan := args.Get(3).(chan string)
