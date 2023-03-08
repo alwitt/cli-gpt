@@ -39,12 +39,12 @@ type ChatSessionParameters struct {
 }
 
 /*
-getDefaultChatSessionParams generate default chat session request params
+GetDefaultChatSessionParams generate default chat session request params
 
 	@param model string - chat session model
 	@return default chat session parameters
 */
-func getDefaultChatSessionParams(model string) ChatSessionParameters {
+func GetDefaultChatSessionParams(model string) ChatSessionParameters {
 	defaultTemp := DefaultChatRequestTemperature
 	defaultTopP := DefaultChatRequestTopP
 	return ChatSessionParameters{

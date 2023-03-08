@@ -208,7 +208,7 @@ func TestChatSessionParams(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 
-	testParam := getDefaultChatSessionParams("test-model")
+	testParam := GetDefaultChatSessionParams("test-model")
 	{
 		assert.Equal(DefaultChatMaxResponseTokens, testParam.MaxTokens)
 		assert.Nil(testParam.Suffix)

@@ -329,7 +329,7 @@ func (c *sqlChatPersistance) NewSession(ctxt context.Context, model string) (Cha
 			ID:             sessionID,
 			State:          ChatSessionStateOpen,
 			UserID:         userID,
-			CommonSettings: getDefaultChatSessionParams(model),
+			CommonSettings: GetDefaultChatSessionParams(model),
 		}
 		if tmp := tx.Create(&newEntry); tmp.Error != nil {
 			log.

@@ -44,8 +44,8 @@ type startNewChatActionCLIArgs struct {
 	commonCLIArgs
 	// Model model to use
 	Model string `validate:"required,oneof=turbo davinci curie babbage ada"`
-	// SettingFile chat session setting file
-	SettingFile string `validate:"omitempty,file"`
+	// SetAsActive whether to make this new chat the active chat session
+	SetAsActive bool
 }
 
 func (c *startNewChatActionCLIArgs) getCLIFlags() []cli.Flag {
@@ -64,14 +64,13 @@ func (c *startNewChatActionCLIArgs) getCLIFlags() []cli.Flag {
 			Destination: &c.Model,
 			Required:    false,
 		},
-		&cli.StringFlag{
-			Name:        "settings-file",
-			Usage:       "YAML file containing chat session settings",
-			Aliases:     []string{"f"},
-			EnvVars:     []string{"CHAT_SESSION_SETTINGS_FILE"},
-			Value:       "",
-			DefaultText: "",
-			Destination: &c.SettingFile,
+		&cli.BoolFlag{
+			Name:        "make-active",
+			Usage:       "Make this new chat session the current active session for the user",
+			Aliases:     []string{"a"},
+			Value:       true,
+			DefaultText: "true",
+			Destination: &c.SetAsActive,
 			Required:    false,
 		},
 	}...)
@@ -82,8 +81,10 @@ func (c *startNewChatActionCLIArgs) getCLIFlags() []cli.Flag {
 var startNewChatParams startNewChatActionCLIArgs
 
 // Helper function to ask user for request parameters if settings file not provided
-func askUserForChatRequestOptions() (persistence.ChatSessionParameters, error) {
-	result := persistence.ChatSessionParameters{}
+func askUserForChatRequestOptions(currentSetting persistence.ChatSessionParameters) (
+	persistence.ChatSessionParameters, error,
+) {
+	newSetting := persistence.ChatSessionParameters{}
 
 	var err error
 	// Ask for model
@@ -91,19 +92,19 @@ func askUserForChatRequestOptions() (persistence.ChatSessionParameters, error) {
 		Label: "Select request model",
 		Items: []string{"turbo", "davinci", "curie", "babbage", "ada"},
 	}
-	if _, result.Model, err = modelPrompt.Run(); err != nil {
-		return result, err
+	if _, newSetting.Model, err = modelPrompt.Run(); err != nil {
+		return newSetting, err
 	}
 
 	// Ask for max token
 	maxTokenPrompt := promptui.Prompt{
 		Label:   "Max tokens per response",
-		Default: "2048",
+		Default: fmt.Sprintf("%d", currentSetting.MaxTokens),
 	}
 	if maxTokenStr, err := maxTokenPrompt.Run(); err != nil {
-		return result, err
-	} else if result.MaxTokens, err = strconv.Atoi(maxTokenStr); err != nil {
-		return result, err
+		return newSetting, err
+	} else if newSetting.MaxTokens, err = strconv.Atoi(maxTokenStr); err != nil {
+		return newSetting, err
 	}
 
 	// Ask for temperature
@@ -111,13 +112,16 @@ func askUserForChatRequestOptions() (persistence.ChatSessionParameters, error) {
 		Label:   "Request temperature",
 		Default: "0.8",
 	}
+	if currentSetting.Temperature != nil {
+		temperaturePrompt.Default = fmt.Sprintf("%f", *currentSetting.Temperature)
+	}
 	if temperatureStr, err := temperaturePrompt.Run(); err != nil {
-		return result, err
+		return newSetting, err
 	} else if temp64, err := strconv.ParseFloat(temperatureStr, 32); err != nil {
-		return result, err
+		return newSetting, err
 	} else {
 		temp32 := float32(temp64)
-		result.Temperature = &temp32
+		newSetting.Temperature = &temp32
 	}
 
 	// Ask for TopP
@@ -125,13 +129,16 @@ func askUserForChatRequestOptions() (persistence.ChatSessionParameters, error) {
 		Label:   "Request TopP",
 		Default: "0",
 	}
+	if currentSetting.TopP != nil {
+		toppPrompt.Default = fmt.Sprintf("%f", *currentSetting.TopP)
+	}
 	if toppStr, err := toppPrompt.Run(); err != nil {
-		return result, err
+		return newSetting, err
 	} else if temp64, err := strconv.ParseFloat(toppStr, 32); err != nil {
-		return result, err
+		return newSetting, err
 	} else {
 		temp32 := float32(temp64)
-		result.TopP = &temp32
+		newSetting.TopP = &temp32
 	}
 
 	// Ask for Presence Penalty
@@ -139,17 +146,20 @@ func askUserForChatRequestOptions() (persistence.ChatSessionParameters, error) {
 		Label:   "Request Presence Penalty",
 		Default: "",
 	}
+	if currentSetting.PresencePenalty != nil {
+		presencePenaltyPrompt.Default = fmt.Sprintf("%f", *currentSetting.PresencePenalty)
+	}
 	if presencePenaltyStr, err := presencePenaltyPrompt.Run(); err != nil {
-		return result, err
+		return newSetting, err
 	} else if len(presencePenaltyStr) > 0 {
 		temp64, err := strconv.ParseFloat(presencePenaltyStr, 32)
 		if err != nil {
-			return result, err
+			return newSetting, err
 		}
 		temp32 := float32(temp64)
-		result.PresencePenalty = &temp32
+		newSetting.PresencePenalty = &temp32
 	} else {
-		result.PresencePenalty = nil
+		newSetting.PresencePenalty = nil
 	}
 
 	// Ask for Frequency Penalty
@@ -157,20 +167,23 @@ func askUserForChatRequestOptions() (persistence.ChatSessionParameters, error) {
 		Label:   "Request Frequency Penalty",
 		Default: "",
 	}
+	if currentSetting.FrequencyPenalty != nil {
+		frequencyPenaltyPrompt.Default = fmt.Sprintf("%f", *currentSetting.FrequencyPenalty)
+	}
 	if frequencyPenaltyStr, err := frequencyPenaltyPrompt.Run(); err != nil {
-		return result, err
+		return newSetting, err
 	} else if len(frequencyPenaltyStr) > 0 {
 		temp64, err := strconv.ParseFloat(frequencyPenaltyStr, 32)
 		if err != nil {
-			return result, err
+			return newSetting, err
 		}
 		temp32 := float32(temp64)
-		result.FrequencyPenalty = &temp32
+		newSetting.FrequencyPenalty = &temp32
 	} else {
-		result.FrequencyPenalty = nil
+		newSetting.FrequencyPenalty = nil
 	}
 
-	return result, nil
+	return newSetting, nil
 }
 
 /*
@@ -200,25 +213,9 @@ func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 			return err
 		}
 
-		// Parse the new chat setting config
-		var newSetting persistence.ChatSessionParameters
-		if len(args.SettingFile) > 0 {
-			settingContent, err := os.ReadFile(args.SettingFile)
-			if err != nil {
-				log.
-					WithError(err).
-					WithFields(logtags).
-					Errorf("Unable to read setting file '%s'", args.SettingFile)
-				return err
-			}
-			if err := yaml.Unmarshal(settingContent, &newSetting); err != nil {
-				log.
-					WithError(err).
-					WithFields(logtags).
-					Errorf("Unable to parse setting file '%s'", args.SettingFile)
-				return err
-			}
-		} else if newSetting, err = askUserForChatRequestOptions(); err != nil {
+		// Get chat session request parameters
+		newSetting, err := askUserForChatRequestOptions(persistence.GetDefaultChatSessionParams("turbo"))
+		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to prompt user for parameters")
 			return err
 		}
@@ -252,6 +249,16 @@ func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 		if err := session.ChangeSettings(app.ctxt, currentSetting); err != nil {
 			log.WithError(err).WithFields(logtags).Error("Failed to apply new session setting")
 			return err
+		}
+
+		if args.SetAsActive {
+			if err := app.currentUser.SetActiveSessionID(app.ctxt, sessionID); err != nil {
+				log.
+					WithError(err).
+					WithFields(logtags).
+					Errorf("Failed to set '%s' as active chat session", sessionID)
+				return err
+			}
 		}
 
 		// Make the first exchange
@@ -546,8 +553,6 @@ type updateChatSettingActionCLIArgs struct {
 	commonCLIArgs
 	// SessionID the chat session ID
 	SessionID string `validate:"required"`
-	// NewSettingFile new chat session setting file
-	NewSettingFile string `validate:"required,file"`
 }
 
 /*
@@ -567,14 +572,6 @@ func (c *updateChatSettingActionCLIArgs) getCLIFlags() []cli.Flag {
 			Aliases:     []string{"i"},
 			EnvVars:     []string{"TARGET_SESSION_ID"},
 			Destination: &c.SessionID,
-			Required:    true,
-		},
-		&cli.StringFlag{
-			Name:        "settings-file",
-			Usage:       "YAML file containing new chat session settings",
-			Aliases:     []string{"f"},
-			EnvVars:     []string{"CHAT_SESSION_SETTINGS_FILE"},
-			Destination: &c.NewSettingFile,
 			Required:    true,
 		},
 	}...)
@@ -630,21 +627,10 @@ func actionUpdateChatSessionSettings(args *updateChatSettingActionCLIArgs) cli.A
 			return err
 		}
 
-		// Parse the new chat setting config
-		settingContent, err := os.ReadFile(args.NewSettingFile)
+		// Get chat session request parameters
+		newSetting, err := askUserForChatRequestOptions(currentSetting)
 		if err != nil {
-			log.
-				WithError(err).
-				WithFields(logtags).
-				Errorf("Unable to read setting file '%s'", args.NewSettingFile)
-			return err
-		}
-		var newSetting persistence.ChatSessionParameters
-		if err := yaml.Unmarshal(settingContent, &newSetting); err != nil {
-			log.
-				WithError(err).
-				WithFields(logtags).
-				Errorf("Unable to parse setting file '%s'", args.NewSettingFile)
+			log.WithError(err).WithFields(logtags).Error("Failed to prompt user for parameters")
 			return err
 		}
 
