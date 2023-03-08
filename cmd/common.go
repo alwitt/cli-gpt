@@ -438,6 +438,14 @@ func GenerateDeleteSubcommands() []*cli.Command {
 			Flags:       standardChatActionParams.getCLIFlags(),
 			Action:      actionDeleteChatSession(&standardChatActionParams),
 		},
+		{
+			Name:        "latest-exchange",
+			Aliases:     []string{"le"},
+			Usage:       "Delete latest exchange",
+			Description: "Delete the latest exchange of a chat session",
+			Flags:       standardChatActionParams.getCLIFlags(),
+			Action:      actionDeleteLatestExchange(&standardChatActionParams),
+		},
 	}
 }
 

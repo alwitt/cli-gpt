@@ -772,6 +772,55 @@ func actionDeleteChatSession(args *standardChatActionCLIArgs) cli.ActionFunc {
 // ================================================================================
 
 /*
+actionDeleteLatestExchange delete latest chat session exchange
+
+	@param args *standardChatActionCLIArgs - CLI arguments
+	@return the CLI action
+*/
+func actionDeleteLatestExchange(args *standardChatActionCLIArgs) cli.ActionFunc {
+	return func(ctx *cli.Context) error {
+		// Initialize application
+		app, err := args.initialSetup(validator.New(), "list-user")
+		if err != nil {
+			log.WithError(err).Error("Failed to prepare new application")
+			return err
+		}
+
+		logtags := app.GetLogTagsForContext(app.ctxt)
+
+		if app.currentUser == nil {
+			return fmt.Errorf("no active user selected")
+		}
+
+		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
+			return err
+		}
+
+		session, err := chatManager.GetSession(app.ctxt, args.SessionID)
+		if err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Could not fetch chat session '%s'", args.SessionID)
+			return err
+		}
+
+		if err := session.DeleteLatestExchange(app.ctxt); err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Unable to delete chat session '%s' latest exchange", args.SessionID)
+			return err
+		}
+		return nil
+	}
+}
+
+// ================================================================================
+
+/*
 ActionAppendToChatSession append new exchange to active chat session
 
 	@param args *commonCLIArgs - CLI arguments

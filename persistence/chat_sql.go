@@ -265,6 +265,30 @@ func (h *sqlChatSessionHandle) Exchanges(ctxt context.Context) ([]ChatExchange, 
 }
 
 /*
+DeleteLatestExchange delete the latest exchange in the session
+
+	@param ctxt context.Context - query context
+*/
+func (h *sqlChatSessionHandle) DeleteLatestExchange(ctxt context.Context) error {
+	logtags := h.GetLogTagsForContext(ctxt)
+	return h.driver.db.Transaction(func(tx *gorm.DB) error {
+		var entry sqlChatExchangeEntry
+		if tmp := tx.
+			Where(&sqlChatExchangeEntry{SessionID: h.ID}).
+			Order("request_timestamp desc").
+			First(&entry); tmp.Error != nil {
+			log.WithError(tmp.Error).WithFields(logtags).Error("Failed to find newest session exchange")
+			return tmp.Error
+		}
+		if tmp := tx.Delete(&entry); tmp.Error != nil {
+			log.WithError(tmp.Error).WithFields(logtags).Error("Failed to delete newest session exchange")
+			return tmp.Error
+		}
+		return nil
+	})
+}
+
+/*
 Refresh helper function to sync the handler with what is stored in persistence
 
 	@param ctxt context.Context - query context

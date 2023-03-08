@@ -426,6 +426,18 @@ func TestSQLChatExchange(t *testing.T) {
 		assert.Equal(exchange2.Response, firstExchange.Response)
 	}
 
+	// Case 3: delete latest exchange
+	assert.Nil(uut.DeleteLatestExchange(utContext))
+	{
+		exchanges, err := uut.Exchanges(utContext)
+		assert.Nil(err)
+		assert.Len(exchanges, 2)
+		assert.Equal(exchange2.Request, exchanges[0].Request)
+		assert.Equal(exchange2.Response, exchanges[0].Response)
+		assert.Equal(exchange0.Request, exchanges[1].Request)
+		assert.Equal(exchange0.Response, exchanges[1].Response)
+	}
+
 	// Case 3: delete session
 	sessionID, err := uut.SessionID(utContext)
 	assert.Nil(err)

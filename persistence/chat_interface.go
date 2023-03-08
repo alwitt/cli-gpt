@@ -184,6 +184,13 @@ type ChatSession interface {
 			@param ctxt context.Context - query context
 	*/
 	Refresh(ctxt context.Context) error
+
+	/*
+		DeleteLatestExchange delete the latest exchange in the session
+
+			@param ctxt context.Context - query context
+	*/
+	DeleteLatestExchange(ctxt context.Context) error
 }
 
 /*
