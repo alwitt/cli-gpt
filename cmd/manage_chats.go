@@ -19,6 +19,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// baseChatAppInitialization helper function to initialize chat related UX application
+func baseChatAppInitialization(args cliArgContext) (
+	*applicationContext, log.Fields, persistence.ChatSessionManager, error,
+) {
+	// Initialize application
+	app, err := args.initialSetup(validator.New(), "list-user")
+	if err != nil {
+		log.WithError(err).Error("Failed to prepare new application")
+		return nil, nil, nil, err
+	}
+
+	logtags := app.GetLogTagsForContext(app.ctxt)
+
+	if app.currentUser == nil {
+		return nil, nil, nil, fmt.Errorf("no active user selected")
+	}
+
+	// Get the associated chat manager
+	chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
+		return nil, nil, nil, err
+	}
+
+	return app, logtags, chatManager, nil
+}
+
 // multilinePrompt prompt the user to input multi-line input
 func multilinePrompt(ctxt context.Context) (string, error) {
 	scanner := bufio.NewScanner(os.Stdin)
@@ -196,21 +223,9 @@ actionStartNewChat start a new chat session
 func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
-		app, err := args.initialSetup(validator.New(), "list-user")
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
-			return err
-		}
-
-		logtags := app.GetLogTagsForContext(app.ctxt)
-
-		if app.currentUser == nil {
-			return fmt.Errorf("no active user selected")
-		}
-
-		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
 			return err
 		}
 
@@ -335,21 +350,9 @@ actionListChatSession list chat sessions associated with the active user
 func actionListChatSession(args *commonCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
-		app, err := args.initialSetup(validator.New(), "list-user")
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
-			return err
-		}
-
-		logtags := app.GetLogTagsForContext(app.ctxt)
-
-		if app.currentUser == nil {
-			return fmt.Errorf("no active user selected")
-		}
-
-		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
 			return err
 		}
 
@@ -470,22 +473,9 @@ actionGetChatSessionDetails print details regarding the chat sessions
 func actionGetChatSessionDetails(args *standardChatActionCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
-		app, err := args.initialSetup(validator.New(), "list-user")
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
-			return err
-		}
-
-		logtags := app.GetLogTagsForContext(app.ctxt)
-
-		if app.currentUser == nil {
-			return fmt.Errorf("no active user selected")
-		}
-
-		// Get the associated chat manager
-		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
 			return err
 		}
 
@@ -591,21 +581,9 @@ actionUpdateChatSessionSettings update the chat session settings
 func actionUpdateChatSessionSettings(args *updateChatSettingActionCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
-		app, err := args.initialSetup(validator.New(), "list-user")
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
-			return err
-		}
-
-		logtags := app.GetLogTagsForContext(app.ctxt)
-
-		if app.currentUser == nil {
-			return fmt.Errorf("no active user selected")
-		}
-
-		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
 			return err
 		}
 
@@ -659,13 +637,11 @@ actionChangeActiveChatSession change the active chat session for current active 
 func actionChangeActiveChatSession(args *standardChatActionCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
-		app, err := args.initialSetup(validator.New(), "list-user")
+		app, logtags, _, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
 			return err
 		}
-
-		logtags := app.GetLogTagsForContext(app.ctxt)
 
 		if app.currentUser == nil {
 			return fmt.Errorf("no active user selected")
@@ -694,21 +670,9 @@ actionCloseChatSession close the chat session
 func actionCloseChatSession(args *standardChatActionCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
-		app, err := args.initialSetup(validator.New(), "list-user")
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
-			return err
-		}
-
-		logtags := app.GetLogTagsForContext(app.ctxt)
-
-		if app.currentUser == nil {
-			return fmt.Errorf("no active user selected")
-		}
-
-		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
 			return err
 		}
 
@@ -789,22 +753,9 @@ func actionDeleteChatSession(args *deleteChatSessionsCLIArgs) cli.ActionFunc {
 		}
 
 		// Initialize application
-		app, err := args.initialSetup(validator.New(), "list-user")
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
-			return err
-		}
-
-		logtags := app.GetLogTagsForContext(app.ctxt)
-
-		if app.currentUser == nil {
-			return fmt.Errorf("no active user selected")
-		}
-
-		// Get the associated chat manager
-		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
 			return err
 		}
 
@@ -838,21 +789,9 @@ actionDeleteLatestExchange delete latest chat session exchange
 func actionDeleteLatestExchange(args *standardChatActionCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
-		app, err := args.initialSetup(validator.New(), "list-user")
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
-			return err
-		}
-
-		logtags := app.GetLogTagsForContext(app.ctxt)
-
-		if app.currentUser == nil {
-			return fmt.Errorf("no active user selected")
-		}
-
-		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
 			return err
 		}
 
@@ -887,21 +826,9 @@ ActionAppendToChatSession append new exchange to active chat session
 func ActionAppendToChatSession(args *commonCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
-		app, err := args.initialSetup(validator.New(), "list-user")
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
-			return err
-		}
-
-		logtags := app.GetLogTagsForContext(app.ctxt)
-
-		if app.currentUser == nil {
-			return fmt.Errorf("no active user selected")
-		}
-
-		chatManager, err := app.currentUser.ChatSessionManager(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Could not define chat session manager")
 			return err
 		}
 

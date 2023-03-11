@@ -194,6 +194,18 @@ func (c *commonCLIArgs) initialSetup(
 	return newContext, nil
 }
 
+// cliArgContext standard CLI argument context object
+type cliArgContext interface {
+	/*
+		initialSetup perform basic application setup
+
+			@param validate *validator.Validate - validation engine
+			@param appInstance string - application instance name
+			@return new application context
+	*/
+	initialSetup(validate *validator.Validate, appInstance string) (*applicationContext, error)
+}
+
 // ================================================================================
 
 // applicationContext application context
