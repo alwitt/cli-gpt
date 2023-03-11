@@ -65,6 +65,70 @@ func multilinePrompt(ctxt context.Context) (string, error) {
 	return inputBuilder.String(), nil
 }
 
+// processOneChatExchange helper function to handle one chat exchange
+func processOneChatExchange(
+	app *applicationContext, session persistence.ChatSession, logtags log.Fields,
+) error {
+	prompt, err := multilinePrompt(app.ctxt)
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Failed to prompt for user request")
+		return err
+	}
+
+	log.WithFields(logtags).Debugf("Your prompt:\n%s\n", prompt)
+
+	promptBuilder, err := api.GetSimpleChatPromptBuilder()
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Failed to define basic prompt builder")
+		return err
+	}
+
+	client, err := api.GetClient(app.ctxt, app.currentUser, promptBuilder)
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
+		return err
+	}
+
+	chatHandler, err := api.DefineChatSessionHandler(app.ctxt, session, client)
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Failed to define chat handler")
+		return err
+	}
+
+	log.WithFields(logtags).Debug("Defined chat handler")
+
+	respChan := make(chan string)
+
+	var reqErr error
+
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if reqErr = chatHandler.SendRequest(app.ctxt, prompt, respChan); reqErr != nil {
+			log.WithError(reqErr).WithFields(logtags).Error("Request-response failed")
+		}
+	}()
+
+	terminate := false
+	for !terminate {
+		select {
+		case <-app.ctxt.Done():
+			terminate = true
+		case msg, ok := <-respChan:
+			if ok {
+				print(msg)
+				terminate = false
+			} else {
+				terminate = true
+			}
+		}
+	}
+
+	return reqErr
+}
+
 // ================================================================================
 
 // startNewChatActionCLIArgs standard cli arguments when starting a new chat session
@@ -278,64 +342,7 @@ func actionStartNewChat(args *startNewChatActionCLIArgs) cli.ActionFunc {
 		}
 
 		// Make the first exchange
-		prompt, err := multilinePrompt(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to prompt for user request")
-			return err
-		}
-
-		log.WithFields(logtags).Debugf("Your prompt:\n%s\n", prompt)
-
-		promptBuilder, err := api.GetSimpleChatPromptBuilder()
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to define basic prompt builder")
-			return err
-		}
-
-		client, err := api.GetClient(app.ctxt, app.currentUser, promptBuilder)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
-			return err
-		}
-
-		chatHandler, err := api.DefineChatSessionHandler(app.ctxt, session, client)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to define chat handler")
-			return err
-		}
-
-		log.WithFields(logtags).Debug("Defined chat handler")
-
-		respChan := make(chan string)
-
-		var reqErr error
-
-		wg := sync.WaitGroup{}
-		defer wg.Wait()
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if reqErr = chatHandler.SendRequest(app.ctxt, prompt, respChan); reqErr != nil {
-				log.WithError(reqErr).WithFields(logtags).Error("Request-response failed")
-			}
-		}()
-
-		terminate := false
-		for !terminate {
-			select {
-			case <-app.ctxt.Done():
-				terminate = true
-			case msg, ok := <-respChan:
-				if ok {
-					print(msg)
-					terminate = false
-				} else {
-					terminate = true
-				}
-			}
-		}
-
-		return reqErr
+		return processOneChatExchange(app, session, logtags)
 	}
 }
 
@@ -841,63 +848,6 @@ func ActionAppendToChatSession(args *commonCLIArgs) cli.ActionFunc {
 			return err
 		}
 
-		prompt, err := multilinePrompt(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to prompt for user request")
-			return err
-		}
-
-		log.WithFields(logtags).Debugf("Your prompt:\n%s\n", prompt)
-
-		promptBuilder, err := api.GetSimpleChatPromptBuilder()
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to define basic prompt builder")
-			return err
-		}
-
-		client, err := api.GetClient(app.ctxt, app.currentUser, promptBuilder)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to define OpenAI API client")
-			return err
-		}
-
-		chatHandler, err := api.DefineChatSessionHandler(app.ctxt, session, client)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to define chat handler")
-			return err
-		}
-
-		log.WithFields(logtags).Debug("Defined chat handler")
-
-		respChan := make(chan string)
-
-		var reqErr error
-
-		wg := sync.WaitGroup{}
-		defer wg.Wait()
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if reqErr = chatHandler.SendRequest(app.ctxt, prompt, respChan); reqErr != nil {
-				log.WithError(reqErr).WithFields(logtags).Error("Request-response failed")
-			}
-		}()
-
-		terminate := false
-		for !terminate {
-			select {
-			case <-app.ctxt.Done():
-				terminate = true
-			case msg, ok := <-respChan:
-				if ok {
-					print(msg)
-					terminate = false
-				} else {
-					terminate = true
-				}
-			}
-		}
-
-		return reqErr
+		return processOneChatExchange(app, session, logtags)
 	}
 }
