@@ -348,6 +348,24 @@ DeleteUser delete a user
 */
 func (c *sqlUserPersistance) DeleteUser(ctxt context.Context, userID string) error {
 	logtags := c.GetLogTagsForContext(ctxt)
+	// Get user
+	userEntry, err := c.GetUser(ctxt, userID)
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Errorf("Unable to find user '%s'", userID)
+		return err
+	}
+	// Get chat manager
+	chatManager, err := userEntry.ChatSessionManager(ctxt)
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Errorf("Unable to get user '%s' chat manager", userID)
+		return err
+	}
+	// Delete all associated chat sessions
+	if err := chatManager.DeleteAllSessions(ctxt); err != nil {
+		log.WithError(err).WithFields(logtags).Errorf("Unable to delete user '%s' chats", userID)
+		return err
+	}
+	// Delete user
 	return c.db.Transaction(func(tx *gorm.DB) error {
 		if tmp := tx.Where(&sqlUserEntry{ID: userID}).Delete(&sqlUserEntry{}); tmp.Error != nil {
 			log.

@@ -521,6 +521,7 @@ func (c *sqlChatPersistance) DeleteSession(ctxt context.Context, sessionID strin
 			return err
 		}
 
+		// Delete the exchanges first
 		if tmp := tx.
 			Where(&sqlChatExchangeEntry{SessionID: sessionID}).
 			Delete(&sqlChatExchangeEntry{}); tmp.Error != nil {
@@ -531,6 +532,7 @@ func (c *sqlChatPersistance) DeleteSession(ctxt context.Context, sessionID strin
 			return tmp.Error
 		}
 
+		// Delete the chat session
 		if tmp := tx.
 			Where(&sqlChatSessionEntry{UserID: userID, ID: sessionID}).
 			Delete(&sqlChatSessionEntry{}); tmp.Error != nil {
@@ -567,6 +569,7 @@ func (c *sqlChatPersistance) DeleteMultipleSessions(ctxt context.Context, sessio
 			return err
 		}
 
+		// Delete the exchanges first
 		if tmp := tx.
 			Where("session_id in ?", sessionIDs).
 			Delete(&sqlChatExchangeEntry{}); tmp.Error != nil {
@@ -578,6 +581,7 @@ func (c *sqlChatPersistance) DeleteMultipleSessions(ctxt context.Context, sessio
 			return tmp.Error
 		}
 
+		// Delete the chat sessions
 		if tmp := tx.
 			Where(&sqlChatSessionEntry{UserID: userID}).
 			Where("id in ?", sessionIDs).
@@ -615,6 +619,7 @@ func (c *sqlChatPersistance) DeleteAllSessions(ctxt context.Context) error {
 			return err
 		}
 
+		// Find all chat sessions attached to the user
 		var allSessions []sqlChatSessionEntry
 		if tmp := tx.Where(&sqlChatSessionEntry{UserID: userID}).Find(&allSessions); tmp.Error != nil {
 			log.
@@ -623,12 +628,17 @@ func (c *sqlChatPersistance) DeleteAllSessions(ctxt context.Context) error {
 				Errorf("Could not get all sessions of user '%s'", userID)
 			return err
 		}
+		if len(allSessions) < 1 {
+			return nil
+		}
 
+		// Extract session IDs
 		sessionIDs := []string{}
 		for _, oneSession := range allSessions {
 			sessionIDs = append(sessionIDs, oneSession.ID)
 		}
 
+		// Delete the exchanges first
 		if tmp := tx.
 			Where("session_id in ?", sessionIDs).
 			Delete(&sqlChatExchangeEntry{}); tmp.Error != nil {
@@ -640,6 +650,7 @@ func (c *sqlChatPersistance) DeleteAllSessions(ctxt context.Context) error {
 			return tmp.Error
 		}
 
+		// Delete the chat sessions
 		if tmp := tx.Delete(&allSessions); tmp.Error != nil {
 			t, _ := json.Marshal(&sessionIDs)
 			log.
