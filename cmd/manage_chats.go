@@ -808,33 +808,21 @@ func actionDeleteChatSession(args *deleteChatSessionsCLIArgs) cli.ActionFunc {
 			return err
 		}
 
-		var sessionIDs []string
 		if args.DeleteAll {
-			allSession, err := chatManager.ListSessions(app.ctxt)
-			if err != nil {
-				log.WithError(err).WithFields(logtags).Error("Could not list all chat sessions")
+			if err := chatManager.DeleteAllSessions(app.ctxt); err != nil {
+				log.WithError(err).WithFields(logtags).Error("Failed to delete all sessions")
 				return err
 			}
-			for _, oneSession := range allSession {
-				sessionID, err := oneSession.SessionID(app.ctxt)
-				if err != nil {
-					log.WithError(err).WithFields(logtags).Error("Could not read session ID")
-					return err
-				}
-				sessionIDs = append(sessionIDs, sessionID)
-			}
 		} else {
-			sessionIDs = args.SessionIDs.Value()
+			sessionIDs := args.SessionIDs.Value()
+			if err := chatManager.DeleteMultipleSessions(app.ctxt, sessionIDs); err != nil {
+				t, _ := json.Marshal(&sessionIDs)
+				log.
+					WithError(err).
+					WithFields(logtags).
+					Errorf("Unable to delete session %s", t)
+			}
 		}
-
-		if err := chatManager.DeleteMultipleSessions(app.ctxt, sessionIDs); err != nil {
-			t, _ := json.Marshal(&sessionIDs)
-			log.
-				WithError(err).
-				WithFields(logtags).
-				Errorf("Unable to delete session %s", t)
-		}
-
 		return nil
 	}
 }

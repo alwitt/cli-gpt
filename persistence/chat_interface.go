@@ -254,4 +254,11 @@ type ChatSessionManager interface {
 			@param sessionIDs []string - session IDs
 	*/
 	DeleteMultipleSessions(ctxt context.Context, sessionIDs []string) error
+
+	/*
+		DeleteMultipleSessions delete all sessions
+
+			@param ctxt context.Context - query context
+	*/
+	DeleteAllSessions(ctxt context.Context) error
 }

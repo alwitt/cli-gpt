@@ -500,4 +500,12 @@ func TestSQLMutlChatSessionDelete(t *testing.T) {
 		assert.Nil(err)
 		assert.Equal(sessionIDs[2], sessionID)
 	}
+
+	// Case 1: delete the rest of the sessions
+	assert.Nil(chatManager.DeleteAllSessions(utContext))
+	{
+		sessions, err := chatManager.ListSessions(utContext)
+		assert.Nil(err)
+		assert.Len(sessions, 0)
+	}
 }
