@@ -443,3 +443,61 @@ func TestSQLChatExchange(t *testing.T) {
 	assert.Nil(err)
 	assert.Nil(chatManager.DeleteSession(utContext, sessionID))
 }
+
+func TestSQLMutlChatSessionDelete(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	testInstance := fmt.Sprintf("ut-%s", uuid.NewString())
+	testDB := fmt.Sprintf("/tmp/%s.db", testInstance)
+
+	userManager, err := GetSQLUserManager(GetSqliteDialector(testDB), logger.Info)
+	assert.Nil(err)
+
+	utContext := context.Background()
+
+	// Create test user
+	user0, err := userManager.RecordNewUser(utContext, "unit-tester-0")
+	assert.Nil(err)
+
+	// Create chat manager
+	chatManager, err := user0.ChatSessionManager(utContext)
+	assert.Nil(err)
+
+	currentTime := time.Now()
+	timeDelta := time.Second * 5
+
+	// Create several sessions
+	sessionIDs := []string{}
+	for itr := 0; itr < 4; itr++ {
+		aSession, err := chatManager.NewSession(utContext, "turbo")
+		assert.Nil(err)
+		sessionID, err := aSession.SessionID(utContext)
+		assert.Nil(err)
+		sessionIDs = append(sessionIDs, sessionID)
+		// Attach exchanges to the session
+		for exItr := 0; exItr < 2; exItr++ {
+			assert.Nil(aSession.RecordOneExchange(utContext, ChatExchange{
+				RequestTimestamp:  currentTime,
+				Request:           fmt.Sprintf("req-%d-%s", exItr, uuid.NewString()),
+				ResponseTimestamp: currentTime.Add(timeDelta),
+				Response:          fmt.Sprintf("resp-%d-%s", exItr, uuid.NewString()),
+			}))
+			currentTime = currentTime.Add(timeDelta)
+		}
+	}
+
+	// Case 0: delete several sessions
+	assert.Nil(chatManager.DeleteMultipleSessions(utContext, []string{sessionIDs[1], sessionIDs[3]}))
+	{
+		sessions, err := chatManager.ListSessions(utContext)
+		assert.Nil(err)
+		assert.Len(sessions, 2)
+		sessionID, err := sessions[0].SessionID(utContext)
+		assert.Nil(err)
+		assert.Equal(sessionIDs[0], sessionID)
+		sessionID, err = sessions[1].SessionID(utContext)
+		assert.Nil(err)
+		assert.Equal(sessionIDs[2], sessionID)
+	}
+}

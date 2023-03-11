@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -537,6 +538,55 @@ func (c *sqlChatPersistance) DeleteSession(ctxt context.Context, sessionID strin
 				WithError(tmp.Error).
 				WithFields(logtags).
 				Errorf("Unable to delete chat session '%s'", sessionID)
+			return tmp.Error
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	// In case the deleted session was the current active session for the user
+	if err := c.user.Refresh(ctxt); err != nil {
+		log.WithError(err).WithFields(logtags).Error("Failed to refresh user entry after session delete")
+		return err
+	}
+	return nil
+}
+
+/*
+DeleteMultipleSessions delete multiple sessions
+
+	@param ctxt context.Context - query context
+	@param sessionIDs []string - session IDs
+*/
+func (c *sqlChatPersistance) DeleteMultipleSessions(ctxt context.Context, sessionIDs []string) error {
+	logtags := c.GetLogTagsForContext(ctxt)
+	if err := c.db.Transaction(func(tx *gorm.DB) error {
+		userID, err := c.user.GetID(ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Unable to get associated user ID")
+			return err
+		}
+
+		if tmp := tx.
+			Where("session_id in ?", sessionIDs).
+			Delete(&sqlChatExchangeEntry{}); tmp.Error != nil {
+			t, _ := json.Marshal(&sessionIDs)
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Unable to delete chat exchanges of sessions %s", t)
+			return tmp.Error
+		}
+
+		if tmp := tx.
+			Where(&sqlChatSessionEntry{UserID: userID}).
+			Where("id in ?", sessionIDs).
+			Delete(&sqlChatSessionEntry{}); tmp.Error != nil {
+			t, _ := json.Marshal(&sessionIDs)
+			log.
+				WithError(tmp.Error).
+				WithFields(logtags).
+				Errorf("Unable to delete chat sessions %s", t)
 			return tmp.Error
 		}
 		return nil

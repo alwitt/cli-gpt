@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -733,14 +734,60 @@ func actionCloseChatSession(args *standardChatActionCLIArgs) cli.ActionFunc {
 
 // ================================================================================
 
+// deleteChatSessionsCLIArgs cli arguments to delete chat sessions
+type deleteChatSessionsCLIArgs struct {
+	commonCLIArgs
+	// SessionIDs the chat session IDs to delete
+	SessionIDs cli.StringSlice
+	// DeleteAll whether to delete all sessions
+	DeleteAll bool
+}
+
+/*
+getCLIFlags fetch the list of CLI arguments
+
+	@return the list of CLI arguments
+*/
+func (c *deleteChatSessionsCLIArgs) getCLIFlags() []cli.Flag {
+	// Get the common CLI flags
+	cliFlags := c.GetCommonCLIFlags()
+
+	// Attach CLI arguments needed for this action
+	cliFlags = append(cliFlags, []cli.Flag{
+		&cli.StringSliceFlag{
+			Name:        "session-id",
+			Usage:       "Target chat session ID",
+			Aliases:     []string{"i"},
+			EnvVars:     []string{"TARGET_SESSION_ID"},
+			Destination: &c.SessionIDs,
+			Required:    false,
+		},
+		&cli.BoolFlag{
+			Name:        "delete-all",
+			Usage:       "Whether to delete all sessions",
+			Aliases:     []string{"A"},
+			Destination: &c.DeleteAll,
+			Required:    false,
+		},
+	}...)
+
+	return cliFlags
+}
+
+var deleteChatSessionsParams deleteChatSessionsCLIArgs
+
 /*
 actionDeleteChatSession delete chat session
 
-	@param args *standardChatActionCLIArgs - CLI arguments
+	@param args *deleteChatSessionsCLIArgs - CLI arguments
 	@return the CLI action
 */
-func actionDeleteChatSession(args *standardChatActionCLIArgs) cli.ActionFunc {
+func actionDeleteChatSession(args *deleteChatSessionsCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
+		if len(args.SessionIDs.Value()) < 1 && !args.DeleteAll {
+			return fmt.Errorf("must provide at least one ID, or must delete ALL session")
+		}
+
 		// Initialize application
 		app, err := args.initialSetup(validator.New(), "list-user")
 		if err != nil {
@@ -761,8 +808,31 @@ func actionDeleteChatSession(args *standardChatActionCLIArgs) cli.ActionFunc {
 			return err
 		}
 
-		if err := chatManager.DeleteSession(app.ctxt, args.SessionID); err != nil {
-			log.WithError(err).WithFields(logtags).Errorf("Unable to delete session '%s'", args.SessionID)
+		var sessionIDs []string
+		if args.DeleteAll {
+			allSession, err := chatManager.ListSessions(app.ctxt)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("Could not list all chat sessions")
+				return err
+			}
+			for _, oneSession := range allSession {
+				sessionID, err := oneSession.SessionID(app.ctxt)
+				if err != nil {
+					log.WithError(err).WithFields(logtags).Error("Could not read session ID")
+					return err
+				}
+				sessionIDs = append(sessionIDs, sessionID)
+			}
+		} else {
+			sessionIDs = args.SessionIDs.Value()
+		}
+
+		if err := chatManager.DeleteMultipleSessions(app.ctxt, sessionIDs); err != nil {
+			t, _ := json.Marshal(&sessionIDs)
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Unable to delete session %s", t)
 		}
 
 		return nil
