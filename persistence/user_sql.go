@@ -36,7 +36,7 @@ func (t sqlUserEntry) String() string {
 // sqlUserHandle wrapper object for working with the "users" table
 type sqlUserHandle struct {
 	goutils.Component
-	driver *sqlUserPersistance
+	driver *sqlUserPersistence
 	sqlUserEntry
 }
 
@@ -197,7 +197,7 @@ ChatSessionManager fetch chat session manager for a user
 func (h *sqlUserHandle) ChatSessionManager(ctxt context.Context) (ChatSessionManager, error) {
 	logtags := h.GetLogTagsForContext(ctxt)
 	logtags["table"] = "chat_sessions"
-	return &sqlChatPersistance{
+	return &sqlChatPersistence{
 		Component: goutils.Component{
 			LogTags:         logtags,
 			LogTagModifiers: []goutils.LogMetadataModifier{},
@@ -211,7 +211,7 @@ func (h *sqlUserHandle) ChatSessionManager(ctxt context.Context) (ChatSessionMan
 // SQL User Manager implementation
 
 // defineUserHandle helper function for defining new user handle object
-func (c *sqlUserPersistance) defineUserHandle(ctxt context.Context, userEntry sqlUserEntry) sqlUserHandle {
+func (c *sqlUserPersistence) defineUserHandle(ctxt context.Context, userEntry sqlUserEntry) sqlUserHandle {
 	logtags := c.GetLogTagsForContext(ctxt)
 	logtags["table"] = "users"
 	logtags["user"] = userEntry.String()
@@ -232,7 +232,7 @@ RecordNewUser record a new system user
 	@param userName string - user name
 	@return	new user entry
 */
-func (c *sqlUserPersistance) RecordNewUser(ctxt context.Context, userName string) (User, error) {
+func (c *sqlUserPersistence) RecordNewUser(ctxt context.Context, userName string) (User, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	var result sqlUserHandle
 	return &result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -262,7 +262,7 @@ ListUsers list all known users
 	@param ctxt context.Context - query context
 	@return list of known users
 */
-func (c *sqlUserPersistance) ListUsers(ctxt context.Context) ([]User, error) {
+func (c *sqlUserPersistence) ListUsers(ctxt context.Context) ([]User, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	result := []User{}
 	return result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -293,7 +293,7 @@ GetUser fetch a user
 	@param userID string - user ID
 	@return user entry
 */
-func (c *sqlUserPersistance) GetUser(ctxt context.Context, userID string) (User, error) {
+func (c *sqlUserPersistence) GetUser(ctxt context.Context, userID string) (User, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	var result sqlUserHandle
 	return &result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -320,7 +320,7 @@ GetUser fetch a user by name
 	@param userName string - user name
 	@return user entry
 */
-func (c *sqlUserPersistance) GetUserByName(ctxt context.Context, userName string) (User, error) {
+func (c *sqlUserPersistence) GetUserByName(ctxt context.Context, userName string) (User, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	var result sqlUserHandle
 	return &result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -346,7 +346,7 @@ DeleteUser delete a user
 	@param ctxt context.Context - query context
 	@param userID string - user ID
 */
-func (c *sqlUserPersistance) DeleteUser(ctxt context.Context, userID string) error {
+func (c *sqlUserPersistence) DeleteUser(ctxt context.Context, userID string) error {
 	logtags := c.GetLogTagsForContext(ctxt)
 	// Get user
 	userEntry, err := c.GetUser(ctxt, userID)

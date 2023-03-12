@@ -65,7 +65,7 @@ func (sqlChatExchangeEntry) TableName() string {
 // sqlChatSessionHandle wrapper object for working with the "chat_sessions" table
 type sqlChatSessionHandle struct {
 	goutils.Component
-	driver    *sqlChatPersistance
+	driver    *sqlChatPersistence
 	validator *validator.Validate
 	sqlChatSessionEntry
 }
@@ -314,7 +314,7 @@ func (h *sqlChatSessionHandle) Refresh(ctxt context.Context) error {
 // SQL Chat Session Manager implementation
 
 // defineSessionHandle helper function for defining new session handle object
-func (c *sqlChatPersistance) defineSessionHandle(ctxt context.Context, sessionEntry sqlChatSessionEntry) sqlChatSessionHandle {
+func (c *sqlChatPersistence) defineSessionHandle(ctxt context.Context, sessionEntry sqlChatSessionEntry) sqlChatSessionHandle {
 	logtags := c.GetLogTagsForContext(ctxt)
 	logtags["session"] = sessionEntry.ID
 	return sqlChatSessionHandle{
@@ -335,7 +335,7 @@ NewSession define a new chat session
 	@param model stirng - OpenAI model name
 	@return	new chat session
 */
-func (c *sqlChatPersistance) NewSession(ctxt context.Context, model string) (ChatSession, error) {
+func (c *sqlChatPersistence) NewSession(ctxt context.Context, model string) (ChatSession, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	var result sqlChatSessionHandle
 	return &result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -378,7 +378,7 @@ ListSessions list all sessions
 	@param ctxt context.Context - query context
 	@return all known sessions
 */
-func (c *sqlChatPersistance) ListSessions(ctxt context.Context) ([]ChatSession, error) {
+func (c *sqlChatPersistence) ListSessions(ctxt context.Context) ([]ChatSession, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	result := []ChatSession{}
 	return result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -415,7 +415,7 @@ GetSession fetch a session
 	@param sessionID string - session ID
 	@return session entry
 */
-func (c *sqlChatPersistance) GetSession(ctxt context.Context, sessionID string) (ChatSession, error) {
+func (c *sqlChatPersistence) GetSession(ctxt context.Context, sessionID string) (ChatSession, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	var result sqlChatSessionHandle
 	return &result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -449,7 +449,7 @@ CurrentActiveSession get the current active chat session for the associated user
 	@param ctxt context.Context - query context
 	@return session entry
 */
-func (c *sqlChatPersistance) CurrentActiveSession(ctxt context.Context) (ChatSession, error) {
+func (c *sqlChatPersistence) CurrentActiveSession(ctxt context.Context) (ChatSession, error) {
 	logtags := c.GetLogTagsForContext(ctxt)
 	var result *sqlChatSessionHandle = nil
 	return result, c.db.Transaction(func(tx *gorm.DB) error {
@@ -496,7 +496,7 @@ SetActiveSession set the current active chat session for the associated user
 	@param ctxt context.Context - query context
 	@param session ChatSession - the chat session
 */
-func (c *sqlChatPersistance) SetActiveSession(ctxt context.Context, session ChatSession) error {
+func (c *sqlChatPersistence) SetActiveSession(ctxt context.Context, session ChatSession) error {
 	logtags := c.GetLogTagsForContext(ctxt)
 	sessionID, err := session.SessionID(ctxt)
 	if err != nil {
@@ -512,7 +512,7 @@ DeleteSession delete a session
 	@param ctxt context.Context - query context
 	@param sessionID string - session ID
 */
-func (c *sqlChatPersistance) DeleteSession(ctxt context.Context, sessionID string) error {
+func (c *sqlChatPersistence) DeleteSession(ctxt context.Context, sessionID string) error {
 	logtags := c.GetLogTagsForContext(ctxt)
 	if err := c.db.Transaction(func(tx *gorm.DB) error {
 		userID, err := c.user.GetID(ctxt)
@@ -560,7 +560,7 @@ DeleteMultipleSessions delete multiple sessions
 	@param ctxt context.Context - query context
 	@param sessionIDs []string - session IDs
 */
-func (c *sqlChatPersistance) DeleteMultipleSessions(ctxt context.Context, sessionIDs []string) error {
+func (c *sqlChatPersistence) DeleteMultipleSessions(ctxt context.Context, sessionIDs []string) error {
 	logtags := c.GetLogTagsForContext(ctxt)
 	if err := c.db.Transaction(func(tx *gorm.DB) error {
 		userID, err := c.user.GetID(ctxt)
@@ -610,7 +610,7 @@ DeleteMultipleSessions delete all sessions
 
 	@param ctxt context.Context - query context
 */
-func (c *sqlChatPersistance) DeleteAllSessions(ctxt context.Context) error {
+func (c *sqlChatPersistence) DeleteAllSessions(ctxt context.Context) error {
 	logtags := c.GetLogTagsForContext(ctxt)
 	if err := c.db.Transaction(func(tx *gorm.DB) error {
 		userID, err := c.user.GetID(ctxt)

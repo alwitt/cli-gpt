@@ -10,14 +10,14 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// SQL persistance layer driver
-type sqlUserPersistance struct {
+// SQL persistence layer driver
+type sqlUserPersistence struct {
 	goutils.Component
 	db *gorm.DB
 }
 
-// SQL persistance layer driver specific to chat session management
-type sqlChatPersistance struct {
+// SQL persistence layer driver specific to chat session management
+type sqlChatPersistence struct {
 	goutils.Component
 	db   *gorm.DB
 	user User
@@ -60,7 +60,7 @@ func GetSQLUserManager(dbDialector gorm.Dialector, logLevel logger.LogLevel) (Us
 	}
 
 	logTags := log.Fields{"module": "persistence", "component": "user-manager", "instance": "sql"}
-	return &sqlUserPersistance{
+	return &sqlUserPersistence{
 		Component: goutils.Component{
 			LogTags:         logTags,
 			LogTagModifiers: []goutils.LogMetadataModifier{},
