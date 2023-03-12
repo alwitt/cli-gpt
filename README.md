@@ -1,5 +1,12 @@
 # CLI GPT - Basic CLI Interface to OpenAI Model Services
 
+[![MIT][License-Image]][License-Url] [![Go Report Card][ReportCard-Image]][ReportCard-Url] [![CICD](https://github.com/alwitt/cli-gpt/actions/workflows/cicd.yaml/badge.svg?branch=main)](https://github.com/alwitt/cli-gpt/actions/workflows/cicd.yaml)
+
+[License-Url]: https://mit-license.org/
+[License-Image]: https://img.shields.io/badge/License-MIT-blue.svg
+[ReportCard-Url]: https://goreportcard.com/report/github.com/alwitt/cli-gpt
+[ReportCard-Image]: https://goreportcard.com/badge/github.com/alwitt/cli-gpt
+
 `CLI GPT` is a simple command line application build around [go-openai](https://github.com/sashabaranov/go-openai) offering a [ChatGPT](https://openai.com/blog/chatgpt) like experience.
 
 # Installation
