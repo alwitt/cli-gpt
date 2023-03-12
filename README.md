@@ -4,6 +4,18 @@
 
 # Installation
 
+Install the application
+
+```shell
+go install github.com/alwitt/cli-gpt@latest
+```
+
+Create a user friendly alias
+
+```shell
+alias gpt="cli-gpt"
+```
+
 # Getting Started
 
 First, create a new user entry.
