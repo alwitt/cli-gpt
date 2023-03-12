@@ -22,7 +22,7 @@ test: .prepare ## Run unittests
 
 .PHONY: build
 build: lint ## Build the application
-	@go build -o cli_gpt.bin .
+	@go build -o gpt .
 
 .PHONY: openapi
 openapi: .prepare ## Generate the OpenAPI spec

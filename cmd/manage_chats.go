@@ -254,7 +254,6 @@ func interactiveChatSessionSelection(
 	}
 	displayEntries := []chatDisplay{}
 
-	minLengthRequest := 100000
 	for _, oneSession := range allSession {
 		sessionID, err := oneSession.SessionID(app.ctxt)
 		if err != nil {
@@ -272,19 +271,19 @@ func interactiveChatSessionSelection(
 		}
 		displayEntry.FirstRequest = firstExchange.Request
 		displayEntries = append(displayEntries, displayEntry)
-		if len(displayEntry.FirstRequest) < minLengthRequest {
-			minLengthRequest = len(displayEntry.FirstRequest)
-		}
 	}
 
 	firstExchanges := []string{}
 	for _, oneChat := range displayEntries {
-		firstExchanges = append(firstExchanges, oneChat.FirstRequest[:minLengthRequest-1])
+		display := strings.TrimSpace(oneChat.FirstRequest)
+		displayLen := 80
+		if len(display) < displayLen {
+			displayLen = len(display)
+		}
+		firstExchanges = append(firstExchanges, display[:displayLen])
 	}
 
-	sessionPrompt := promptui.Select{
-		Label: "Select chat session", Items: firstExchanges, StartInSearchMode: true,
-	}
+	sessionPrompt := promptui.Select{Label: "Select chat session", Items: firstExchanges}
 	selected, _, err := sessionPrompt.Run()
 	if err != nil {
 		log.WithError(err).WithFields(logtags).Error("Chat session selection failure")
