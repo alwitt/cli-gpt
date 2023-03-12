@@ -129,49 +129,6 @@ func processOneChatExchange(
 	return reqErr
 }
 
-// ================================================================================
-
-// startNewChatActionCLIArgs standard cli arguments when starting a new chat session
-type startNewChatActionCLIArgs struct {
-	commonCLIArgs
-	// Model model to use
-	Model string `validate:"required,oneof=turbo davinci curie babbage ada"`
-	// SetAsActive whether to make this new chat the active chat session
-	SetAsActive bool
-}
-
-func (c *startNewChatActionCLIArgs) getCLIFlags() []cli.Flag {
-	// Get the common CLI flags
-	cliFlags := c.GetCommonCLIFlags()
-
-	// Attach CLI arguments needed for this action
-	cliFlags = append(cliFlags, []cli.Flag{
-		&cli.StringFlag{
-			Name:        "model",
-			Usage:       "Text generation model: [turbo davinci curie babbage ada]",
-			Aliases:     []string{"m"},
-			EnvVars:     []string{"TEXT_COMPLETION_MODEL"},
-			Value:       "turbo",
-			DefaultText: "turbo",
-			Destination: &c.Model,
-			Required:    false,
-		},
-		&cli.BoolFlag{
-			Name:        "make-active",
-			Usage:       "Make this new chat session the current active session for the user",
-			Aliases:     []string{"a"},
-			Value:       true,
-			DefaultText: "true",
-			Destination: &c.SetAsActive,
-			Required:    false,
-		},
-	}...)
-
-	return cliFlags
-}
-
-var startNewChatParams startNewChatActionCLIArgs
-
 // Helper function to ask user for request parameters if settings file not provided
 func askUserForChatRequestOptions(currentSetting persistence.ChatSessionParameters) (
 	persistence.ChatSessionParameters, error,
@@ -277,6 +234,104 @@ func askUserForChatRequestOptions(currentSetting persistence.ChatSessionParamete
 
 	return newSetting, nil
 }
+
+// interactiveChatSessionSelection interactive way to select a session
+func interactiveChatSessionSelection(
+	app *applicationContext, chatManager persistence.ChatSessionManager, logtags log.Fields,
+) (string, error) {
+	allSession, err := chatManager.ListSessions(app.ctxt)
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Failed to read all chat sessions")
+		return "", err
+	}
+
+	// Go through each session, and get the ID and first request
+	type chatDisplay struct {
+		SessionID    string `yaml:"id"`
+		FirstRequest string `yaml:"request"`
+	}
+	displayEntries := []chatDisplay{}
+
+	for _, oneSession := range allSession {
+		sessionID, err := oneSession.SessionID(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Session read failed")
+			return "", err
+		}
+		displayEntry := chatDisplay{SessionID: sessionID}
+		firstExchange, err := oneSession.FirstExchange(app.ctxt)
+		if err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Unable to read session '%s' first exchange", sessionID)
+			return "", err
+		}
+		displayEntry.FirstRequest = firstExchange.Request
+		displayEntries = append(displayEntries, displayEntry)
+	}
+
+	firstExchanges := []string{}
+	for _, oneChat := range displayEntries {
+		displayLength := 40
+		if len(oneChat.FirstRequest) < displayLength {
+			displayLength = len(oneChat.FirstRequest)
+		}
+		firstExchanges = append(firstExchanges, oneChat.FirstRequest[:displayLength])
+	}
+
+	sessionPrompt := promptui.Select{Label: "Select chat session", Items: firstExchanges}
+	selected, _, err := sessionPrompt.Run()
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Chat session selection failure")
+		return "", err
+	}
+
+	return displayEntries[selected].SessionID, nil
+}
+
+// ================================================================================
+
+// startNewChatActionCLIArgs standard cli arguments when starting a new chat session
+type startNewChatActionCLIArgs struct {
+	commonCLIArgs
+	// Model model to use
+	Model string `validate:"required,oneof=turbo davinci curie babbage ada"`
+	// SetAsActive whether to make this new chat the active chat session
+	SetAsActive bool
+}
+
+func (c *startNewChatActionCLIArgs) getCLIFlags() []cli.Flag {
+	// Get the common CLI flags
+	cliFlags := c.GetCommonCLIFlags()
+
+	// Attach CLI arguments needed for this action
+	cliFlags = append(cliFlags, []cli.Flag{
+		&cli.StringFlag{
+			Name:        "model",
+			Usage:       "Text generation model: [turbo davinci curie babbage ada]",
+			Aliases:     []string{"m"},
+			EnvVars:     []string{"TEXT_COMPLETION_MODEL"},
+			Value:       "turbo",
+			DefaultText: "turbo",
+			Destination: &c.Model,
+			Required:    false,
+		},
+		&cli.BoolFlag{
+			Name:        "make-active",
+			Usage:       "Make this new chat session the current active session for the user",
+			Aliases:     []string{"a"},
+			Value:       true,
+			DefaultText: "true",
+			Destination: &c.SetAsActive,
+			Required:    false,
+		},
+	}...)
+
+	return cliFlags
+}
+
+var startNewChatParams startNewChatActionCLIArgs
 
 /*
 actionStartNewChat start a new chat session
@@ -438,7 +493,7 @@ func actionListChatSession(args *commonCLIArgs) cli.ActionFunc {
 type standardChatActionCLIArgs struct {
 	commonCLIArgs
 	// SessionID the chat session ID
-	SessionID string `validate:"required"`
+	SessionID string
 }
 
 /*
@@ -458,7 +513,7 @@ func (c *standardChatActionCLIArgs) getCLIFlags() []cli.Flag {
 			Aliases:     []string{"i"},
 			EnvVars:     []string{"TARGET_SESSION_ID"},
 			Destination: &c.SessionID,
-			Required:    true,
+			Required:    false,
 		},
 	}...)
 
@@ -490,6 +545,14 @@ func actionGetChatSessionDetails(args *standardChatActionCLIArgs) cli.ActionFunc
 		if err != nil {
 			log.WithError(err).WithFields(logtags).Error("Unable to query user's active session")
 			return err
+		}
+
+		if args.SessionID == "" {
+			args.SessionID, err = interactiveChatSessionSelection(app, chatManager, logtags)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("Session selection failure")
+				return err
+			}
 		}
 
 		session, err := chatManager.GetSession(app.ctxt, args.SessionID)
@@ -546,52 +609,27 @@ func actionGetChatSessionDetails(args *standardChatActionCLIArgs) cli.ActionFunc
 
 // ================================================================================
 
-// updateChatSettingActionCLIArgs cli arguments to update the chat session setting
-type updateChatSettingActionCLIArgs struct {
-	commonCLIArgs
-	// SessionID the chat session ID
-	SessionID string `validate:"required"`
-}
-
-/*
-getCLIFlags fetch the list of CLI arguments
-
-	@return the list of CLI arguments
-*/
-func (c *updateChatSettingActionCLIArgs) getCLIFlags() []cli.Flag {
-	// Get the common CLI flags
-	cliFlags := c.GetCommonCLIFlags()
-
-	// Attach CLI arguments needed for this action
-	cliFlags = append(cliFlags, []cli.Flag{
-		&cli.StringFlag{
-			Name:        "session-id",
-			Usage:       "Target chat session ID",
-			Aliases:     []string{"i"},
-			EnvVars:     []string{"TARGET_SESSION_ID"},
-			Destination: &c.SessionID,
-			Required:    true,
-		},
-	}...)
-
-	return cliFlags
-}
-
-var updateChatSettingParams updateChatSettingActionCLIArgs
-
 /*
 actionUpdateChatSessionSettings update the chat session settings
 
-	@param args *updateChatSettingActionCLIArgs - CLI arguments
+	@param args *standardChatActionCLIArgs - CLI arguments
 	@return the CLI action
 */
-func actionUpdateChatSessionSettings(args *updateChatSettingActionCLIArgs) cli.ActionFunc {
+func actionUpdateChatSessionSettings(args *standardChatActionCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
 		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
 			return err
+		}
+
+		if args.SessionID == "" {
+			args.SessionID, err = interactiveChatSessionSelection(app, chatManager, logtags)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("Session selection failure")
+				return err
+			}
 		}
 
 		session, err := chatManager.GetSession(app.ctxt, args.SessionID)
@@ -644,7 +682,7 @@ actionChangeActiveChatSession change the active chat session for current active 
 func actionChangeActiveChatSession(args *standardChatActionCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
-		app, logtags, _, err := baseChatAppInitialization(args)
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
 			return err
@@ -652,6 +690,14 @@ func actionChangeActiveChatSession(args *standardChatActionCLIArgs) cli.ActionFu
 
 		if app.currentUser == nil {
 			return fmt.Errorf("no active user selected")
+		}
+
+		if args.SessionID == "" {
+			args.SessionID, err = interactiveChatSessionSelection(app, chatManager, logtags)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("Session selection failure")
+				return err
+			}
 		}
 
 		if err := app.currentUser.SetActiveSessionID(app.ctxt, args.SessionID); err != nil {
@@ -681,6 +727,14 @@ func actionCloseChatSession(args *standardChatActionCLIArgs) cli.ActionFunc {
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
 			return err
+		}
+
+		if args.SessionID == "" {
+			args.SessionID, err = interactiveChatSessionSelection(app, chatManager, logtags)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("Session selection failure")
+				return err
+			}
 		}
 
 		session, err := chatManager.GetSession(app.ctxt, args.SessionID)
@@ -800,6 +854,14 @@ func actionDeleteLatestExchange(args *standardChatActionCLIArgs) cli.ActionFunc 
 		if err != nil {
 			log.WithError(err).Error("Failed to prepare new application")
 			return err
+		}
+
+		if args.SessionID == "" {
+			args.SessionID, err = interactiveChatSessionSelection(app, chatManager, logtags)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("Session selection failure")
+				return err
+			}
 		}
 
 		session, err := chatManager.GetSession(app.ctxt, args.SessionID)

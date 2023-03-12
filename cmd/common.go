@@ -421,8 +421,8 @@ func GenerateUpdateSubcommands() []*cli.Command {
 			Aliases:     []string{"chats"},
 			Usage:       "Update chat session request settings",
 			Description: "Update chat session request settings",
-			Flags:       updateChatSettingParams.getCLIFlags(),
-			Action:      actionUpdateChatSessionSettings(&updateChatSettingParams),
+			Flags:       standardChatActionParams.getCLIFlags(),
+			Action:      actionUpdateChatSessionSettings(&standardChatActionParams),
 		},
 	}
 }
