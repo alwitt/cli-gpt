@@ -14,7 +14,9 @@ fix: .prepare ## Lint and fix vialoations
 
 .PHONY: mock
 mock: .prepare ## Generate test mock interfaces
-	@mockery --all
+	@mockery --dir api --name Client
+	@mockery --dir persistence --name User
+	@mockery --dir persistence --name ChatSession
 
 .PHONY: test
 test: .prepare ## Run unittests

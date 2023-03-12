@@ -32,7 +32,10 @@ jobs:
           mockery-version: "2.20.2"
 
       - name: Generate mock classes
-        run: mockery --all
+        run: |
+          mockery --dir api --name Client
+          mockery --dir persistence --name User
+          mockery --dir persistence --name ChatSession
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -59,7 +62,10 @@ jobs:
           mockery-version: "2.20.2"
 
       - name: Generate mock classes
-        run: mockery --all
+        run: |
+          mockery --dir api --name Client
+          mockery --dir persistence --name User
+          mockery --dir persistence --name ChatSession
 
       - name: Test
         run: go test --count 1 -timeout 30s -short ./...
