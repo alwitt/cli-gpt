@@ -31,6 +31,9 @@ jobs:
         with:
           mockery-version: "2.20.2"
 
+      - name: Generate mock classes
+        run: mockery --all
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
@@ -54,6 +57,9 @@ jobs:
       - uses: brokeyourbike/go-mockery-action@v0
         with:
           mockery-version: "2.20.2"
+
+      - name: Generate mock classes
+        run: mockery --all
 
       - name: Test
         run: go test --count 1 -timeout 30s -short ./...
