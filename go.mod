@@ -9,9 +9,9 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/manifoldco/promptui v0.9.0
 	github.com/oklog/ulid/v2 v2.1.0
-	github.com/sashabaranov/go-openai v1.4.2
+	github.com/sashabaranov/go-openai v1.5.0
 	github.com/stretchr/testify v1.8.2
-	github.com/urfave/cli/v2 v2.24.4
+	github.com/urfave/cli/v2 v2.25.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/sqlite v1.4.4
 	gorm.io/gorm v1.24.5

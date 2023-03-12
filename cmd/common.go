@@ -417,6 +417,14 @@ GenerateUpdateSubcommands generate list of subcommands for "update"
 func GenerateUpdateSubcommands() []*cli.Command {
 	return []*cli.Command{
 		{
+			Name:        "user",
+			Aliases:     []string{"users"},
+			Usage:       "Update user settings",
+			Description: "Update user settings",
+			Flags:       specifyUserParams.getCLIFlags(),
+			Action:      actionUpdateUser(&specifyUserParams),
+		},
+		{
 			Name:        "chat",
 			Aliases:     []string{"chats"},
 			Usage:       "Update chat session request settings",

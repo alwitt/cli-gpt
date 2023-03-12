@@ -54,6 +54,35 @@ func interactiveUserSelection(app *applicationContext) (string, error) {
 	return displayEntries[selected].UserID, nil
 }
 
+// Helper function to ask for user parameters
+func askForUserParameters(app *applicationContext, oldUsername, oldAPIToken *string) (
+	string, string, error,
+) {
+	logtags := app.GetLogTagsForContext(app.ctxt)
+
+	usernamePrompt := promptui.Prompt{Label: "Username"}
+	if oldUsername != nil {
+		usernamePrompt.Default = *oldUsername
+	}
+	username, err := usernamePrompt.Run()
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Unable to query for username")
+		return "", "", err
+	}
+
+	apiTokenPrompt := promptui.Prompt{Label: "API Token", HideEntered: true}
+	if oldAPIToken != nil {
+		apiTokenPrompt.Default = *oldAPIToken
+	}
+	apiToken, err := apiTokenPrompt.Run()
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Unable to query for API token")
+		return "", "", err
+	}
+
+	return username, apiToken, nil
+}
+
 // ================================================================================
 
 /*
@@ -74,17 +103,9 @@ func actionCreateUser(args *commonCLIArgs) cli.ActionFunc {
 		logtags := app.GetLogTagsForContext(app.ctxt)
 
 		// Prompt for user info
-		usernamePrompt := promptui.Prompt{Label: "Username"}
-		username, err := usernamePrompt.Run()
+		username, apiToken, err := askForUserParameters(app, nil, nil)
 		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Unable to query for username")
-			return err
-		}
-
-		apiTokenPrompt := promptui.Prompt{Label: "API Token"}
-		apiToken, err := apiTokenPrompt.Run()
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Unable to query for API token")
+			log.WithError(err).WithFields(logtags).Error("User parameter prompt failed")
 			return err
 		}
 
@@ -104,6 +125,14 @@ func actionCreateUser(args *commonCLIArgs) cli.ActionFunc {
 		}
 
 		log.WithFields(logtags).Infof("Created new user '%s'", username)
+
+		if app.currentUser == nil {
+			app.currentUser = userEntry
+			if err := app.record(); err != nil {
+				log.WithError(err).WithFields(logtags).Error("Unable to record application context")
+				return err
+			}
+		}
 
 		return nil
 	}
@@ -256,6 +285,71 @@ func actionChangeActiveUser(args *specifyUserCLIArgs) cli.ActionFunc {
 		app.currentUser = userEntry
 		if err := app.record(); err != nil {
 			log.WithError(err).WithFields(logtags).Error("Unable to record application context")
+			return err
+		}
+
+		return nil
+	}
+}
+
+// ================================================================================
+
+/*
+actionUpdateUser update parameters of a user
+
+	@param args *specifyUserCLIArgs - CLI arguments
+	@return the CLI action
+*/
+func actionUpdateUser(args *specifyUserCLIArgs) cli.ActionFunc {
+	return func(ctx *cli.Context) error {
+		// Initialize application
+		app, err := args.initialSetup(validator.New(), "delete-user")
+		if err != nil {
+			log.WithError(err).Error("Failed to prepare new application")
+			return err
+		}
+
+		logtags := app.GetLogTagsForContext(app.ctxt)
+
+		if args.UserID == "" {
+			args.UserID, err = interactiveUserSelection(app)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("User selection failure")
+				return err
+			}
+		}
+
+		userEntry, err := app.userManager.GetUser(app.ctxt, args.UserID)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Errorf("Unable to read user '%s'", args.UserID)
+			return err
+		}
+
+		currentUsername, err := userEntry.GetName(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Errorf("Unable to read user '%s' name", args.UserID)
+			return err
+		}
+
+		currentAPIToken, err := userEntry.GetAPIToken(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Errorf("Unable to read user '%s' token", args.UserID)
+			return err
+		}
+
+		// Prompt for user info
+		newUsername, newAPIToken, err := askForUserParameters(app, &currentUsername, &currentAPIToken)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("User parameter prompt failed")
+			return err
+		}
+
+		if err := userEntry.SetName(app.ctxt, newUsername); err != nil {
+			log.WithError(err).WithFields(logtags).Errorf("Unable to update user '%s' name", args.UserID)
+			return err
+		}
+		if err := userEntry.SetAPIToken(app.ctxt, newAPIToken); err != nil {
+			log.WithError(err).WithFields(logtags).Errorf("Unable to update user '%s' token", args.UserID)
 			return err
 		}
 

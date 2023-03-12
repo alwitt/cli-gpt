@@ -173,9 +173,9 @@ func (s *chatSessionHandlerImpl) SendRequest(
 	// Record this exchange
 	exchange := persistence.ChatExchange{
 		RequestTimestamp:  requestTimestamp,
-		Request:           prompt,
+		Request:           strings.TrimSpace(prompt),
 		ResponseTimestamp: responseTimestamp,
-		Response:          response,
+		Response:          strings.TrimSpace(response),
 	}
 
 	if err := s.session.RecordOneExchange(ctxt, exchange); err != nil {
