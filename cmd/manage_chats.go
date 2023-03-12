@@ -126,6 +126,8 @@ func processOneChatExchange(
 		}
 	}
 
+	print("\n")
+
 	return reqErr
 }
 
@@ -252,6 +254,7 @@ func interactiveChatSessionSelection(
 	}
 	displayEntries := []chatDisplay{}
 
+	minLengthRequest := 100000
 	for _, oneSession := range allSession {
 		sessionID, err := oneSession.SessionID(app.ctxt)
 		if err != nil {
@@ -269,18 +272,19 @@ func interactiveChatSessionSelection(
 		}
 		displayEntry.FirstRequest = firstExchange.Request
 		displayEntries = append(displayEntries, displayEntry)
+		if len(displayEntry.FirstRequest) < minLengthRequest {
+			minLengthRequest = len(displayEntry.FirstRequest)
+		}
 	}
 
 	firstExchanges := []string{}
 	for _, oneChat := range displayEntries {
-		displayLength := 40
-		if len(oneChat.FirstRequest) < displayLength {
-			displayLength = len(oneChat.FirstRequest)
-		}
-		firstExchanges = append(firstExchanges, oneChat.FirstRequest[:displayLength])
+		firstExchanges = append(firstExchanges, oneChat.FirstRequest[:minLengthRequest-1])
 	}
 
-	sessionPrompt := promptui.Select{Label: "Select chat session", Items: firstExchanges}
+	sessionPrompt := promptui.Select{
+		Label: "Select chat session", Items: firstExchanges, StartInSearchMode: true,
+	}
 	selected, _, err := sessionPrompt.Run()
 	if err != nil {
 		log.WithError(err).WithFields(logtags).Error("Chat session selection failure")
@@ -809,10 +813,6 @@ actionDeleteChatSession delete chat session
 */
 func actionDeleteChatSession(args *deleteChatSessionsCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
-		if len(args.SessionIDs.Value()) < 1 && !args.DeleteAll {
-			return fmt.Errorf("must provide at least one ID, or must delete ALL session")
-		}
-
 		// Initialize application
 		app, logtags, chatManager, err := baseChatAppInitialization(args)
 		if err != nil {
@@ -825,14 +825,26 @@ func actionDeleteChatSession(args *deleteChatSessionsCLIArgs) cli.ActionFunc {
 				log.WithError(err).WithFields(logtags).Error("Failed to delete all sessions")
 				return err
 			}
-		} else {
+		} else if len(args.SessionIDs.Value()) > 0 {
 			sessionIDs := args.SessionIDs.Value()
 			if err := chatManager.DeleteMultipleSessions(app.ctxt, sessionIDs); err != nil {
 				t, _ := json.Marshal(&sessionIDs)
 				log.
 					WithError(err).
 					WithFields(logtags).
-					Errorf("Unable to delete session %s", t)
+					Errorf("Unable to delete sessions %s", t)
+			}
+		} else {
+			sessionID, err := interactiveChatSessionSelection(app, chatManager, logtags)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("Session selection failure")
+				return err
+			}
+			if err := chatManager.DeleteSession(app.ctxt, sessionID); err != nil {
+				log.
+					WithError(err).
+					WithFields(logtags).
+					Errorf("Unable to delete session %s", sessionID)
 			}
 		}
 		return nil
