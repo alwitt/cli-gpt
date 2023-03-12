@@ -47,13 +47,13 @@ func main() {
 			{
 				Name:        "delete",
 				Usage:       "Delete resources",
-				Description: "Delete resources",
+				Description: "Delete recorded resources",
 				Subcommands: cmd.GenerateDeleteSubcommands(),
 			},
 			{
 				Name:        "context",
-				Usage:       "User context settings",
-				Description: "User context settings",
+				Usage:       "Context settings",
+				Description: "Context settings",
 				Subcommands: cmd.GenerateContextSubcommands(),
 			},
 			// Usage specific commands
