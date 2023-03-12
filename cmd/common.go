@@ -395,8 +395,8 @@ func GenerateCreateSubcommands() []*cli.Command {
 			Aliases:     []string{"users"},
 			Usage:       "Register new user",
 			Description: "Register new user",
-			Flags:       createUserParams.getCLIFlags(),
-			Action:      actionCreateUser(&createUserParams),
+			Flags:       CommonParams.GetCommonCLIFlags(),
+			Action:      actionCreateUser(&CommonParams),
 		},
 		{
 			Name:        "chat",
@@ -439,8 +439,8 @@ func GenerateDeleteSubcommands() []*cli.Command {
 			Aliases:     []string{"users"},
 			Usage:       "Delete currently active user",
 			Description: "Delete currently active user. This will also delete this user's data.",
-			Flags:       CommonParams.GetCommonCLIFlags(),
-			Action:      actionDeleteActiveUser(&CommonParams),
+			Flags:       specifyUserParams.getCLIFlags(),
+			Action:      actionDeleteUser(&specifyUserParams),
 		},
 		{
 			Name:        "chat",
@@ -469,11 +469,11 @@ GenerateContextSubcommands generate list of subcommands for "delete"
 func GenerateContextSubcommands() []*cli.Command {
 	return []*cli.Command{
 		{
-			Name:        "change-user",
+			Name:        "select-user",
 			Usage:       "Change active user",
 			Description: "Change the currently active user",
-			Flags:       changeActiveUserParams.getCLIFlags(),
-			Action:      actionChangeActiveUser(&changeActiveUserParams),
+			Flags:       specifyUserParams.getCLIFlags(),
+			Action:      actionChangeActiveUser(&specifyUserParams),
 		},
 		{
 			Name:        "select-chat",

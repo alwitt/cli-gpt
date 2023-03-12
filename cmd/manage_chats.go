@@ -246,18 +246,21 @@ func interactiveChatSessionSelection(
 		log.WithError(err).WithFields(logtags).Error("Failed to read all chat sessions")
 		return "", err
 	}
+	if len(allSession) == 0 {
+		return "", fmt.Errorf("user has no chat sessions")
+	}
 
 	// Go through each session, and get the ID and first request
 	type chatDisplay struct {
-		SessionID    string `yaml:"id"`
-		FirstRequest string `yaml:"request"`
+		SessionID    string
+		FirstRequest string
 	}
 	displayEntries := []chatDisplay{}
 
 	for _, oneSession := range allSession {
 		sessionID, err := oneSession.SessionID(app.ctxt)
 		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Session read failed")
+			log.WithError(err).WithFields(logtags).Error("Session ID read failed")
 			return "", err
 		}
 		displayEntry := chatDisplay{SessionID: sessionID}

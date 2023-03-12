@@ -5,62 +5,64 @@ import (
 
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
+	"github.com/manifoldco/promptui"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 )
 
+// interactiveUserSelection interactive way to select a user
+func interactiveUserSelection(app *applicationContext) (string, error) {
+	logtags := app.GetLogTagsForContext(app.ctxt)
+
+	allUsers, err := app.userManager.ListUsers(app.ctxt)
+	if err != nil {
+		log.WithError(err).WithFields(logtags).Error("Unable to query all users")
+		return "", err
+	}
+	if len(allUsers) == 0 {
+		return "", fmt.Errorf("no users registered with the system")
+	}
+
+	type userDisplay struct {
+		UserID   string
+		Username string
+	}
+	displayEntries := []userDisplay{}
+	usernames := []string{}
+
+	for _, oneUser := range allUsers {
+		userID, err := oneUser.GetID(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("User ID read failed")
+			return "", err
+		}
+		username, err := oneUser.GetName(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Username read failed")
+			return "", err
+		}
+		displayEntries = append(displayEntries, userDisplay{UserID: userID, Username: username})
+		usernames = append(usernames, username)
+	}
+
+	userPrompt := promptui.Select{Label: "Select user", Items: usernames}
+	selected, _, err := userPrompt.Run()
+	if err != nil {
+		return "", err
+	}
+
+	return displayEntries[selected].UserID, nil
+}
+
 // ================================================================================
-
-// createUserCLIArgs cli arguments needed defining a new user
-type createUserCLIArgs struct {
-	commonCLIArgs
-	// Username new user name
-	Username string `validate:"required"`
-	// APIToken user's API token
-	APIToken string `validate:"required"`
-}
-
-/*
-getCLIFlags fetch the list of CLI arguments
-
-	@return the list of CLI arguments
-*/
-func (c *createUserCLIArgs) getCLIFlags() []cli.Flag {
-	// Get the common CLI flags
-	cliFlags := c.GetCommonCLIFlags()
-
-	// Attach CLI arguments needed for this action
-	cliFlags = append(cliFlags, []cli.Flag{
-		&cli.StringFlag{
-			Name:        "username",
-			Usage:       "New user name",
-			Aliases:     []string{"u"},
-			EnvVars:     []string{"NEW_USERNAME"},
-			Destination: &c.Username,
-			Required:    true,
-		},
-		&cli.StringFlag{
-			Name:        "api-token",
-			Usage:       "User's API token",
-			Aliases:     []string{"t"},
-			EnvVars:     []string{"USER_API_TOKEN"},
-			Destination: &c.APIToken,
-			Required:    true,
-		},
-	}...)
-
-	return cliFlags
-}
-
-var createUserParams createUserCLIArgs
 
 /*
 actionCreateUser create new user
 
-	@param args *createUserCLIArgs - CLI arguments
+	@param args *commonCLIArgs - CLI arguments
 	@return the CLI action
 */
-func actionCreateUser(args *createUserCLIArgs) cli.ActionFunc {
+func actionCreateUser(args *commonCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
 		app, err := args.initialSetup(validator.New(), "create-user")
@@ -71,22 +73,37 @@ func actionCreateUser(args *createUserCLIArgs) cli.ActionFunc {
 
 		logtags := app.GetLogTagsForContext(app.ctxt)
 
-		userEntry, err := app.userManager.RecordNewUser(app.ctxt, args.Username)
+		// Prompt for user info
+		usernamePrompt := promptui.Prompt{Label: "Username"}
+		username, err := usernamePrompt.Run()
 		if err != nil {
-			log.WithError(err).WithFields(logtags).Errorf("Failed to define new user '%s'", args.Username)
+			log.WithError(err).WithFields(logtags).Error("Unable to query for username")
+			return err
+		}
+
+		apiTokenPrompt := promptui.Prompt{Label: "API Token"}
+		apiToken, err := apiTokenPrompt.Run()
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Unable to query for API token")
+			return err
+		}
+
+		userEntry, err := app.userManager.RecordNewUser(app.ctxt, username)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Errorf("Failed to define new user '%s'", username)
 			return nil
 		}
 
 		// Install user API token
-		if err := userEntry.SetAPIToken(app.ctxt, args.APIToken); err != nil {
+		if err := userEntry.SetAPIToken(app.ctxt, apiToken); err != nil {
 			log.
 				WithError(err).
 				WithFields(logtags).
-				Errorf("Failed to record API token to user '%s'", args.Username)
+				Errorf("Failed to record API token to user '%s'", username)
 			return nil
 		}
 
-		log.WithFields(logtags).Infof("Created new user '%s'", args.Username)
+		log.WithFields(logtags).Infof("Created new user '%s'", username)
 
 		return nil
 	}
@@ -169,11 +186,11 @@ func actionListUsers(args *commonCLIArgs) cli.ActionFunc {
 
 // ================================================================================
 
-// changeActiveUserCLIArgs cli arguments needed to change the active user
-type changeActiveUserCLIArgs struct {
+// specifyUserCLIArgs cli arguments needed to refer to a user
+type specifyUserCLIArgs struct {
 	commonCLIArgs
 	// UserID user ID to delete
-	UserID string `validate:"required"`
+	UserID string
 }
 
 /*
@@ -181,7 +198,7 @@ getCLIFlags fetch the list of CLI arguments
 
 	@return the list of CLI arguments
 */
-func (c *changeActiveUserCLIArgs) getCLIFlags() []cli.Flag {
+func (c *specifyUserCLIArgs) getCLIFlags() []cli.Flag {
 	// Get the common CLI flags
 	cliFlags := c.GetCommonCLIFlags()
 
@@ -193,14 +210,14 @@ func (c *changeActiveUserCLIArgs) getCLIFlags() []cli.Flag {
 			Aliases:     []string{"i"},
 			EnvVars:     []string{"USER_ID"},
 			Destination: &c.UserID,
-			Required:    true,
+			Required:    false,
 		},
 	}...)
 
 	return cliFlags
 }
 
-var changeActiveUserParams changeActiveUserCLIArgs
+var specifyUserParams specifyUserCLIArgs
 
 /*
 actionChangeActiveUser change the active user
@@ -208,7 +225,7 @@ actionChangeActiveUser change the active user
 	@param args *changeActiveUserCLIArgs - CLI arguments
 	@return the CLI action
 */
-func actionChangeActiveUser(args *changeActiveUserCLIArgs) cli.ActionFunc {
+func actionChangeActiveUser(args *specifyUserCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
 		app, err := args.initialSetup(validator.New(), "create-user")
@@ -218,6 +235,14 @@ func actionChangeActiveUser(args *changeActiveUserCLIArgs) cli.ActionFunc {
 		}
 
 		logtags := app.GetLogTagsForContext(app.ctxt)
+
+		if args.UserID == "" {
+			args.UserID, err = interactiveUserSelection(app)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("User selection failure")
+				return err
+			}
+		}
 
 		userEntry, err := app.userManager.GetUser(app.ctxt, args.UserID)
 		if err != nil {
@@ -241,12 +266,12 @@ func actionChangeActiveUser(args *changeActiveUserCLIArgs) cli.ActionFunc {
 // ================================================================================
 
 /*
-actionListUsers list available users
+actionDeleteUser delete a user
 
-	@param args *commonCLIArgs - CLI arguments
+	@param args *specifyUserCLIArgs - CLI arguments
 	@return the CLI action
 */
-func actionDeleteActiveUser(args *commonCLIArgs) cli.ActionFunc {
+func actionDeleteUser(args *specifyUserCLIArgs) cli.ActionFunc {
 	return func(ctx *cli.Context) error {
 		// Initialize application
 		app, err := args.initialSetup(validator.New(), "delete-user")
@@ -257,27 +282,27 @@ func actionDeleteActiveUser(args *commonCLIArgs) cli.ActionFunc {
 
 		logtags := app.GetLogTagsForContext(app.ctxt)
 
-		if app.currentUser == nil {
-			// No action to take if no active user selected
-			err := fmt.Errorf("no active user")
-			log.WithError(err).WithFields(logtags).Error("Unable to delete active user")
-			return err
+		if args.UserID == "" {
+			args.UserID, err = interactiveUserSelection(app)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("User selection failure")
+				return err
+			}
 		}
 
-		userID, err := app.currentUser.GetID(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Failed to read active user ID")
-			return nil
+		if app.currentUser != nil {
+			currentUserID, err := app.currentUser.GetID(app.ctxt)
+			if err != nil || currentUserID == args.UserID {
+				app.currentUser = nil
+				if err := app.record(); err != nil {
+					log.WithError(err).WithFields(logtags).Error("Unable to record application context")
+					return err
+				}
+			}
 		}
 
-		if err := app.userManager.DeleteUser(app.ctxt, userID); err != nil {
-			log.WithError(err).WithFields(logtags).Errorf("Failed to delete user '%s'", userID)
-			return err
-		}
-
-		app.currentUser = nil
-		if err := app.record(); err != nil {
-			log.WithError(err).WithFields(logtags).Error("Unable to record application context")
+		if err := app.userManager.DeleteUser(app.ctxt, args.UserID); err != nil {
+			log.WithError(err).WithFields(logtags).Errorf("Failed to delete user '%s'", args.UserID)
 			return err
 		}
 
