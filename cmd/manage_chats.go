@@ -495,6 +495,149 @@ func actionListChatSession(args *commonCLIArgs) cli.ActionFunc {
 
 // ================================================================================
 
+// describeChatActionCLIArgs cli arguments to print one specific chat session
+type describeChatActionCLIArgs struct {
+	commonCLIArgs
+	// SessionID the chat session ID
+	SessionID string
+	// Detailed view
+	Detailed bool
+}
+
+/*
+getCLIFlags fetch the list of CLI arguments
+
+	@return the list of CLI arguments
+*/
+func (c *describeChatActionCLIArgs) getCLIFlags() []cli.Flag {
+	// Get the common CLI flags
+	cliFlags := c.GetCommonCLIFlags()
+
+	// Attach CLI arguments needed for this action
+	cliFlags = append(cliFlags, []cli.Flag{
+		&cli.StringFlag{
+			Name:        "session-id",
+			Usage:       "Target chat session ID",
+			Aliases:     []string{"i"},
+			EnvVars:     []string{"TARGET_SESSION_ID"},
+			Destination: &c.SessionID,
+			Required:    false,
+		},
+		&cli.BoolFlag{
+			Name:        "detailed",
+			Usage:       "Print all information regarding a chat session",
+			Aliases:     []string{"d"},
+			Value:       false,
+			DefaultText: "false",
+			Destination: &c.Detailed,
+			Required:    false,
+		},
+	}...)
+
+	return cliFlags
+}
+
+var describeChatActionParams describeChatActionCLIArgs
+
+/*
+actionGetChatSessionDetails print details regarding the chat sessions
+
+- session metadata
+
+- all exchanges
+
+	@param args *describeChatActionParams - CLI arguments
+	@return the CLI action
+*/
+func actionGetChatSessionDetails(args *describeChatActionCLIArgs) cli.ActionFunc {
+	return func(ctx *cli.Context) error {
+		// Initialize application
+		app, logtags, chatManager, err := baseChatAppInitialization(args)
+		if err != nil {
+			log.WithError(err).Error("Failed to prepare new application")
+			return err
+		}
+
+		activeSession, err := app.currentUser.GetActiveSessionID(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Unable to query user's active session")
+			return err
+		}
+
+		if args.SessionID == "" {
+			args.SessionID, err = interactiveChatSessionSelection(app, chatManager, logtags)
+			if err != nil {
+				log.WithError(err).WithFields(logtags).Error("Session selection failure")
+				return err
+			}
+		}
+
+		session, err := chatManager.GetSession(app.ctxt, args.SessionID)
+		if err != nil {
+			log.
+				WithError(err).
+				WithFields(logtags).
+				Errorf("Could not fetch chat session '%s'", args.SessionID)
+			return err
+		}
+
+		exchanges, err := session.Exchanges(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Session exchanges read failed")
+			return err
+		}
+
+		// Print only the chat exchanges
+		if !args.Detailed {
+			builder := strings.Builder{}
+			for _, oneExchange := range exchanges {
+				_, _ = builder.WriteString(oneExchange.String())
+			}
+			print(builder.String())
+			return nil
+		}
+
+		// Create the display
+		type sessionDisplay struct {
+			SessionID       string                            `yaml:"id"`
+			CurrentlyActive bool                              `yaml:"in-focus"`
+			SessionState    string                            `yaml:"state"`
+			Settings        persistence.ChatSessionParameters `yaml:"settings"`
+			Exchanges       []persistence.ChatExchange        `yaml:"exchanges"`
+		}
+		display := sessionDisplay{SessionID: args.SessionID}
+		if activeSession != nil {
+			if args.SessionID == *activeSession {
+				display.CurrentlyActive = true
+			}
+		}
+
+		state, err := session.SessionState(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Session state read failed")
+			return err
+		}
+		display.SessionState = string(state)
+
+		display.Settings, err = session.Settings(app.ctxt)
+		if err != nil {
+			log.WithError(err).WithFields(logtags).Error("Session setting read failed")
+			return err
+		}
+
+		display.Exchanges = exchanges
+
+		// Display as YAML
+		t, _ := yaml.Marshal(&display)
+
+		fmt.Printf("%s\n", t)
+
+		return nil
+	}
+}
+
+// ================================================================================
+
 // standardChatActionCLIArgs standard cli arguments when working with a specific chat session
 type standardChatActionCLIArgs struct {
 	commonCLIArgs
@@ -527,93 +670,6 @@ func (c *standardChatActionCLIArgs) getCLIFlags() []cli.Flag {
 }
 
 var standardChatActionParams standardChatActionCLIArgs
-
-/*
-actionGetChatSessionDetails print details regarding the chat sessions
-
-- session metadata
-
-- all exchanges
-
-	@param args *standardChatActionCLIArgs - CLI arguments
-	@return the CLI action
-*/
-func actionGetChatSessionDetails(args *standardChatActionCLIArgs) cli.ActionFunc {
-	return func(ctx *cli.Context) error {
-		// Initialize application
-		app, logtags, chatManager, err := baseChatAppInitialization(args)
-		if err != nil {
-			log.WithError(err).Error("Failed to prepare new application")
-			return err
-		}
-
-		activeSession, err := app.currentUser.GetActiveSessionID(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Unable to query user's active session")
-			return err
-		}
-
-		if args.SessionID == "" {
-			args.SessionID, err = interactiveChatSessionSelection(app, chatManager, logtags)
-			if err != nil {
-				log.WithError(err).WithFields(logtags).Error("Session selection failure")
-				return err
-			}
-		}
-
-		session, err := chatManager.GetSession(app.ctxt, args.SessionID)
-		if err != nil {
-			log.
-				WithError(err).
-				WithFields(logtags).
-				Errorf("Could not fetch chat session '%s'", args.SessionID)
-			return err
-		}
-
-		// Create the display
-		type sessionDisplay struct {
-			SessionID       string                            `yaml:"id"`
-			CurrentlyActive bool                              `yaml:"in-focus"`
-			SessionState    string                            `yaml:"state"`
-			Settings        persistence.ChatSessionParameters `yaml:"settings"`
-			Exchanges       []persistence.ChatExchange        `yaml:"exchanges"`
-		}
-		display := sessionDisplay{SessionID: args.SessionID}
-		if activeSession != nil {
-			if args.SessionID == *activeSession {
-				display.CurrentlyActive = true
-			}
-		}
-
-		state, err := session.SessionState(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Session state read failed")
-			return err
-		}
-		display.SessionState = string(state)
-
-		display.Settings, err = session.Settings(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Session setting read failed")
-			return err
-		}
-
-		display.Exchanges, err = session.Exchanges(app.ctxt)
-		if err != nil {
-			log.WithError(err).WithFields(logtags).Error("Session exchanges read failed")
-			return err
-		}
-
-		// Display as YAML
-		t, _ := yaml.Marshal(&display)
-
-		fmt.Printf("%s\n", t)
-
-		return nil
-	}
-}
-
-// ================================================================================
 
 /*
 actionUpdateChatSessionSettings update the chat session settings

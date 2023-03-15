@@ -377,8 +377,8 @@ func GenerateDescribeSubcommands() []*cli.Command {
 			Aliases:     []string{"chat"},
 			Usage:       "Print details of a chat session",
 			Description: "Print details of a chat session",
-			Flags:       standardChatActionParams.getCLIFlags(),
-			Action:      actionGetChatSessionDetails(&standardChatActionParams),
+			Flags:       describeChatActionParams.getCLIFlags(),
+			Action:      actionGetChatSessionDetails(&describeChatActionParams),
 		},
 	}
 }

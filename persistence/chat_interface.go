@@ -2,6 +2,8 @@ package persistence
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -12,7 +14,7 @@ const (
 	// DefaultChatMaxResponseTokens default max token count for chat session response
 	DefaultChatMaxResponseTokens = 2048
 	// DefaultChatRequestTemperature default chat request temperature
-	DefaultChatRequestTemperature = float32(1.0)
+	DefaultChatRequestTemperature = float32(0.5)
 	// DefaultChatRequestTopP default chat request TopP
 	DefaultChatRequestTopP = float32(0)
 
@@ -95,6 +97,35 @@ type ChatExchange struct {
 	Request           string    `yaml:"request" json:"request" validate:"required"`
 	ResponseTimestamp time.Time `yaml:"response_ts" json:"response_ts" validate:"required"`
 	Response          string    `yaml:"response" json:"response" validate:"required"`
+}
+
+/*
+String toString function for ChatExchange
+
+	@return string representation of one chat exchange
+*/
+func (c ChatExchange) String() string {
+	builder := strings.Builder{}
+
+	_, _ = builder.WriteString(
+		fmt.Sprintf("[%s] REQUEST:\n", c.RequestTimestamp.Format("02 Jan 2006, 15:04:05")),
+	)
+	_, _ = builder.WriteString(
+		"========================================================================\n",
+	)
+	_, _ = builder.WriteString(c.Request)
+
+	_, _ = builder.WriteString(
+		fmt.Sprintf("\n\n%s RESPONSE:\n", c.ResponseTimestamp.Format("02 Jan 2006, 15:04:05")),
+	)
+	_, _ = builder.WriteString(
+		"------------------------------------------------------------------------\n",
+	)
+	_, _ = builder.WriteString(c.Response)
+
+	_, _ = builder.WriteString("\n\n")
+
+	return builder.String()
 }
 
 /*
